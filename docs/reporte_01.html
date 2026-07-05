@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resumen de Ingeniería - Configuración e Instrumental Inercial</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+            color: #2c3e50;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 45px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            border-top: 8px solid #2980b9;
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 26px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 13px;
+            margin-bottom: 35px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 20px;
+        }
+        h2 {
+            color: #2980b9;
+            font-size: 19px;
+            margin-top: 35px;
+            border-left: 5px solid #2980b9;
+            padding-left: 12px;
+        }
+        h3 {
+            color: #34495e;
+            font-size: 15px;
+            margin-top: 20px;
+            background-color: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border-left: 3px solid #7f8c8d;
+        }
+        p, li {
+            font-size: 15px;
+            text-align: justify;
+            color: #34495e;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 18px;
+            border-radius: 6px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            border-left: 5px solid #16a085;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #dcdde1;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #34495e;
+            color: #ffffff;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .math-box {
+            background-color: #f1f2f6;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 18px 0;
+            font-family: "Georgia", serif;
+            font-style: italic;
+            font-size: 19px;
+            text-align: center;
+            color: #130f40;
+            border-left: 5px solid #34495e;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .math-box var {
+            font-family: "Georgia", serif;
+            font-style: italic;
+            font-weight: bold;
+            color: #2980b9;
+        }
+        .diagram-container {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #fafbfc;
+            border: 1px dashed #b2bec3;
+            border-radius: 8px;
+        }
+        .highlight {
+            background-color: #fff9db;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 45px;
+            text-align: center;
+            font-size: 11px;
+            color: #95a5a6;
+            border-top: 1px solid #ecf0f1;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Resumen de Ingeniería: Instrumental Inercial</h1>
+        <div class="subtitle">Proyecto: Robot Autoequilibrado con IA | Desarrollador: César Yépez | MacBook Pro Environment</div>
+
+        <h2>1. Aprovisionamiento y Configuración de Arduino IDE</h2>
+        <p>Dado que el procesador Xtensa de 32 bits integrado en el módulo <strong>ESP8266 NodeMCU V3</strong> no es soportado por defecto por el entorno base, se ejecutó la siguiente metodología de aprovisionamiento cruzado (Toolchains):</p>
+        <ol>
+            <li><strong>Declaración del Manifiesto Remoto:</strong> Se inyectó la URL del core oficial de la comunidad en el gestor de tarjetas adicionales de las preferencias globales del sistema:
+                <br><code>http://arduino.esp8266.com/stable/package_esp8266com_index.json</code>
+            </li>
+            <li><strong>Indexación y Selección de la Tarjeta:</strong> Desde el Gestor de Tarjetas, se descargaron los binarios compiladores para la arquitectura Xtensa LX106 y se seleccionó el perfil de hardware <span class="highlight">NodeMCU 1.0 (ESP-12E Module)</span>.</li>
+            <li><strong>Mapeo de Dispositivo en macOS:</strong> El sistema reconoció el chip puente USB-Serie CH340 y asignó la siguiente interfaz de hardware en el árbol Unix de la Mac, habilitando las cargas por <code>esptool.py</code>:
+                <br><span class="highlight">Puerto Activo = /dev/cu.usbserial-142340</span>
+            </li>
+        </ol>
+
+        <h2>2. Naturaleza Teórica de las Mediciones del Sensor MPU6050</h2>
+        <p>La Unidad de Medición Inercial (IMU) opera celdas electromecánicas microscópicas de silicio (MEMS) indexadas en un espacio tridimensional ortogonal (X, Y, Z). El chip entrega lecturas crudas en registros binarios enteros con signo de 16 bits (rango de -32768 a +32767) que son traducidos por software a valores físicos comprensibles para el humano:</p>
+        
+        <h3>2.1 El Acelerómetro (Medición de Fuerzas Inerciales Propias)</h3>
+        <p>Mide la aceleración lineal propia experimentada por unidad de masa. Con el sensor configurado en su rango de operación estándar de &plusmn;2<i>g</i>, la constante de escala matemática de traducción es 16384 LSB/<i>g</i>. La librería convierte esta lectura a unidades del Sistema Internacional (m/s²) multiplicándola por la gravedad estándar:</p>
+        <div class="math-box">A<sub>física</sub> (m/s²) = (A<sub>cruda</sub> / 16384) &times; 9.80665</div>
+
+        <h3>2.2 El Giroscopio (Medición de Velocidad Angular)</h3>
+        <p>Mide la velocidad de rotación o cambio angular sobre sus propios ejes fijos. Ajustado en su rango de fábrica de &plusmn;250&deg;/s, su constante divisor de escala es 131 LSB/(&deg;/s). La conversión matemática a radianes por segundo (rad/s) —la velocidad angular natural requerida por las matrices de control— se rige por:</p>
+        <div class="math-box">&omega;<sub>física</sub> (rad/s) = (&omega;<sub>cruda</sub> / 131) &times; (&pi; / 180)</div>
+
+        <h2>3. Algoritmo de Calibración Estática y Resultados de Bias</h2>
+        <p>Cualquier transductor inercial del mundo real presenta imperfecciones en su geometría interna debidas al proceso de fabricación o al estrés térmico y mecánico de la soldadura. Este error constante se modela como un desfase llamado <strong>Bias</strong> (<var>B</var>). Para purificar las señales, el error sistemático constante debe ser aislado del ruido estocástico aleatorio (ruido blanco Gaussiano de media cero) mediante un promedio estadístico masivo de <span class="highlight">1000 muestras continuas</span> con la IMU inmóvil:</p>
+        <div class="math-box"><var>B</var> = (1 / 1000) &times; &sum;<sub>i=1</sub><sup>1000</sup> <var>V</var><sub>crudo, i</sub></div>
+
+        <p>Los experimentos arrojaron una consistencia analítica robusta, evidenciada por la estabilidad decimal inter-corrida (<span style="color:#c0392b; font-weight:bold;">&Delta; &approx; 10<sup>-4</sup></span>), definiendo los siguientes <strong>Offsets de Laboratorio</strong>:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Componente Inercial</th>
+                    <th>Eje Físico Analizado</th>
+                    <th>Coeficiente Estático de Error (Bias)</th>
+                    <th>Unidad del S.I.</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td rowspan="3"><strong>Acelerómetro de Silicio</strong></td>
+                    <td>Eje Longitudinal X (AccX)</td>
+                    <td>0.583814</td>
+                    <td>m/s²</td>
+                </tr>
+                <tr>
+                    <td>Eje Lateral Y (AccY)</td>
+                    <td>0.124246</td>
+                    <td>m/s²</td>
+                </tr>
+                <tr>
+                    <td>Eje Vertical Z (AccZ) [Desvío vs g]</td>
+                    <td>0.748841</td>
+                    <td>m/s²</td>
+                </tr>
+                <tr>
+                    <td rowspan="3"><strong>Giroscopio de Estado Sólido</strong></td>
+                    <td>Eje de Alabeo X (GyrX)</td>
+                    <td>-0.069378</td>
+                    <td>rad/s</td>
+                </tr>
+                <tr>
+                    <td>Eje de Cabeceo Y (GyrY)</td>
+                    <td>0.012485</td>
+                    <td>rad/s</td>
+                </tr>
+                <tr>
+                    <td>Eje de Guiñada Z (GyrZ)</td>
+                    <td>-0.003735</td>
+                    <td>rad/s</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. Geometría Corporal de la Caída y Cálculo del Ángulo (Pitch)</h2>
+        <p>Para controlar el péndulo invertido del robot, debemos estimar de forma matemática exacta el ángulo de cabeceo respecto al centro gravitacional de la Tierra. El vector de la <strong>Gravedad Real (<var>g</var>)</strong> es una invariante física que apunta <strong>siempre vertical e inamovible hacia abajo</strong>, actuando como la hipotenusa de nuestro sistema geométrico. Cuando el sensor se inclina un ángulo <span style="font-weight:bold; color:#f39c12;">&theta;</span>, mide la descomposición ortogonal de la gravedad sobre sus propios ejes de silicio:</p>
+
+        <div class="diagram-container">
+            <svg width="100%" height="340" viewBox="0 0 650 340" style="background-color: #ffffff;">
+                <line x1="20" y1="310" x2="630" y2="310" stroke="#34495e" stroke-width="2" />
+                <g>
+                    <line x1="160" y1="20" x2="160" y2="310" stroke="#7f8c8d" stroke-width="1.5" stroke-dasharray="6,6" />
+                    <line x1="160" y1="80" x2="160" y2="250" stroke="#27ae60" stroke-width="4.5" />
+                    <polygon points="160,260 154,245 166,245" fill="#27ae60" />
+                    <text x="75" y="165" font-family="Georgia" font-size="14" fill="#27ae60" font-weight="bold">Gravedad Real (g)</text>
+                    <text x="75" y="185" font-family="Georgia" font-size="12" fill="#7f8c8d">[Hipotenusa Fija]</text>
+                </g>
+
+                <g transform="rotate(-20, 160, 80)">
+                    <rect x="140" y="65" width="40" height="30" fill="#2980b9" rx="3" opacity="0.8" />
+                    <text x="160" y="83" font-family="Arial" font-size="9" fill="#ffffff" font-weight="bold" text-anchor="middle">MPU6050</text>
+
+                    <line x1="160" y1="80" x2="160" y2="280" stroke="#d35400" stroke-width="2.5" />
+                    <polygon points="160,290 156,278 164,278" fill="#d35400" />
+                    <text x="175" y="275" font-family="Georgia" font-size="14" fill="#d35400" font-weight="bold">Z<sub>sensor</sub></text>
+
+                    <line x1="160" y1="80" x2="320" y2="80" stroke="#e67e22" stroke-width="2.5" />
+                    <polygon points="330,80 318,76 318,84" fill="#e67e22" />
+                    <text x="315" y="105" font-family="Georgia" font-size="14" fill="#e67e22" font-weight="bold">X<sub>sensor</sub></text>
+
+                    <line x1="160" y1="80" x2="160" y2="240" stroke="#c0392b" stroke-width="4" stroke-linecap="round" />
+                    <polygon points="160,243 156,233 164,233" fill="#c0392b" />
+                    
+                    <line x1="160" y1="240" x2="218" y2="240" stroke="#2980b9" stroke-width="2" stroke-dasharray="4,4" />
+                </g>
+
+                <g transform="translate(250, 20)">
+                    <line x1="160" y1="40" x2="160" y2="220" stroke="#27ae60" stroke-width="3.5" />
+                    <polygon points="160,227 155,215 165,215" fill="#27ae60" />
+                    <text x="175" y="130" font-family="Georgia" font-size="14" fill="#27ae60" font-weight="bold">g [Hipotenusa]</text>
+
+                    <line x1="160" y1="40" x2="98" y2="209" stroke="#c0392b" stroke-width="3" />
+                    <polygon points="98,209 104,198 109,203" fill="#c0392b" />
+                    <text x="10" y="115" font-family="Georgia" font-size="14" fill="#c0392b" font-weight="bold">A<sub>z</sub> = g &times; cos(&theta;)</text>
+                    <text x="25" y="133" font-family="Georgia" font-size="11" fill="#7f8c8d">[Cateto Adyacente]</text>
+
+                    <line x1="98" y1="209" x2="160" y2="222" stroke="#e67e22" stroke-width="3" />
+                    <polygon points="160,222 148,216 150,224" fill="#e67e22" />
+                    <text x="110" y="250" font-family="Georgia" font-size="14" fill="#e67e22" font-weight="bold">A<sub>x</sub> = g &times; sin(&theta;)</text>
+                    <text x="110" y="266" font-family="Georgia" font-size="11" fill="#7f8c8d">[Cateto Opuesto]</text>
+
+                    <path d="M 160 80 A 40 40 0 0 1 146 76" fill="none" stroke="#f39c12" stroke-width="2.5" />
+                    <text x="145" y="105" font-family="Georgia" font-size="15" fill="#f39c12" font-weight="bold">&theta;</text>
+                    
+                    <path d="M 103 200 L 110 202 L 105 211" fill="none" stroke="#34495e" stroke-width="1.2"/>
+                </g>
+            </svg>
+        </div>
+
+        <h3>4.1 Deducción del Algoritmo de Cabeceo Estático</h3>
+        <p>Al analizar los componentes medidos por el sensor bajo rotación, descubrimos que las aceleraciones cartesianas son funciones directas de la proyección de la gravedad:</p>
+        <div class="math-box">A<sub>x</sub> = <var>g</var> &times; sin(&theta;) &nbsp;&nbsp;|&nbsp;&nbsp; A<sub>z</sub> = <var>g</var> &times; cos(&theta;)</div>
+        
+        <p>Dividiendo el cateto opuesto entre el cateto adyacente, eliminamos algebraicamente la constante física de la gravedad (<var>g</var>):</p>
+        <div class="math-box">A<sub>x</sub> / A<sub>z</sub> = (<var>g</var> &times; sin(&theta;)) / (<var>g</var> &times; cos(&theta;)) = tan(&theta;)</div>
+        
+        <p>Para recuperar el ángulo <span style="font-weight:bold; color:#f39c12;">&theta;</span> de forma robusta, se descarta el uso de la función arco tangente simple (<code>atan</code>) por riesgo de indeterminación. Implementamos la función nativa de ingeniería de dos variables <strong><code>atan2(A<sub>x</sub>, A<sub>z</sub>)</code></strong>, la cual procesa de forma independiente los cuadrantes y los signos algebraicos en el procesador. La escala final de radianes a grados sexagesimales se rige por:</p>
+        <div class="math-box">&theta;<sub>rad</sub> = atan2(A<sub>x</sub>, A<sub>z</sub>) &nbsp;&nbsp;|&nbsp;&nbsp; &theta;<sub>grados</sub> = &theta;<sub>rad</sub> &times; (180 / &pi;)</div>
+
+        <div class="footer">
+            Unidad de Ingeniería de Sistemas de Control Inteligente &copy; 2026. Documentación de Nivel Científico.
+        </div>
+    </div>
+</body>
+</html>
