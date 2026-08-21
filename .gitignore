@@ -18,3 +18,29 @@ data/*.csv
 models/*.pkl
 models/*.h5
 experiments/outputs/
+
+# --- Repo reordenado para compartir con el profesor (Algoritmos Evolutivos I) ---
+# Solo notebooks/ e informes/ se comparten por ahora. El resto del repo (robot
+# balanceador: firmware, docs, tests, experimentos) queda fuera de git
+# temporalmente -- sigue existiendo en el filesystem, solo no se trackea.
+# notebooks/ e informes/ NO se ignoran (se listan explicitos mas abajo).
+CLAUDE.md
+algoritmos_evolutivos_pso/
+docs/
+experiments/
+firmware/
+test/
+
+# Resto trackeado de la arquitectura ESP8266+Nano, abandonada (ver CLAUDE.md,
+# "Decisiones revertidas"). Sacado del tracking con git rm --cached
+# (2026-08-19) -- sigue en el filesystem, solo deja de versionarse.
+# Ancladas a la raiz (/) a proposito: sin la barra tapaban tambien
+# notebooks/README.md y notebooks/requirements.txt (entorno virtual del
+# notebook para el profesor), que si se quieren compartir.
+/README.md
+/requirements.txt
+/python/
+
+# Cache de imagenes de ecuaciones (mathtext), regenerada sola en cada build
+# de generar_pdf.py -- no aporta nada versionada, solo ruido de binarios.
+informes/eq/
