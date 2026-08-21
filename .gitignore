@@ -34,6 +34,13 @@ test/
 # Resto trackeado de la arquitectura ESP8266+Nano, abandonada (ver CLAUDE.md,
 # "Decisiones revertidas"). Sacado del tracking con git rm --cached
 # (2026-08-19) -- sigue en el filesystem, solo deja de versionarse.
-README.md
-requirements.txt
-python/
+# Ancladas a la raiz (/) a proposito: sin la barra tapaban tambien
+# notebooks/README.md y notebooks/requirements.txt (entorno virtual del
+# notebook para el profesor), que si se quieren compartir.
+/README.md
+/requirements.txt
+/python/
+
+# Cache de imagenes de ecuaciones (mathtext), regenerada sola en cada build
+# de generar_pdf.py -- no aporta nada versionada, solo ruido de binarios.
+informes/eq/

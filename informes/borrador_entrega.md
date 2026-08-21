@@ -3,17 +3,21 @@
 
 **Materia**: Algoritmos Evolutivos I (2026) — Desafío Práctico
 **Técnica**: Optimización por Enjambre de Partículas (PSO)
-**Repositorio**: _(completar con la URL antes de entregar)_
+**Repositorio**: https://github.com/piertotumlocomotor/robot_balance (rama `develop`) — el notebook está en `notebooks/pso_pendulo_invertido.ipynb`
 
 ---
 
+![El robot balanceador real](robot_foto.png)
+
+*El robot real sobre el que se midieron todos los parámetros físicos de este trabajo: tres niveles de madera de aeromodelismo, dos motorreductores con encoder (M1, M2) en espejo sobre el eje de las ruedas.*
+
 ## 1. El problema
 
-Un robot balanceador de dos ruedas es, en la vecindad de su posición vertical, un **péndulo invertido**: un sistema inestable a lazo abierto que un controlador tiene que corregir constantemente para no caer. El controlador es un PID clásico — a partir del ángulo de inclinación medido, calcula cuánto comandarle a los motores para volver a la vertical.
+Un robot balanceador de dos ruedas es, cerca de su posición vertical, un **péndulo invertido**: inestable a lazo abierto, requiere un controlador que lo corrija todo el tiempo. El controlador es un PID clásico — a partir del ángulo medido, calcula qué señal enviarle a los motores para volver a la vertical. Encontrar buenas ganancias (Kp, Ki, Kd) a mano es lento y poco sistemático: es optimización en un espacio continuo de 3 dimensiones sobre una función de costo sin forma cerrada (depende de simular la dinámica en el tiempo). **PSO** encaja bien: no necesita gradientes, tolera una función de costo no diferenciable (la nuestra tiene una penalización discontinua), y es simple de implementar y entender término a término.
 
-Encontrar buenas ganancias (Kp, Ki, Kd) a mano es lento y poco sistemático: es un problema de optimización en un espacio continuo de tres dimensiones, sobre una función de costo que no tiene forma cerrada — depende de simular la respuesta dinámica del sistema en el tiempo, y esa simulación en sí misma no es trivial de definir bien (ver sección 3.4). Es un caso de uso natural para un algoritmo de optimización basado en población, y en particular para **PSO**: no necesita gradientes, tolera una función de costo no diferenciable (la nuestra tiene una penalización discontinua), y su implementación es lo bastante simple como para escribirla desde cero y entender cada término.
+Este trabajo no usa datos de ejemplo: **todos los parámetros físicos salen de mediciones directas** sobre un robot real (ESP32, MPU6050, motorreductores con encoder, driver L298N en modo *brake*). Buena parte del valor está en cómo se midieron esos parámetros y en los errores descartados en el camino (sección 4).
 
-Este trabajo no usa un problema de juguete ni datos de ejemplo: **todos los parámetros físicos del modelo salen de mediciones directas** sobre un robot balanceador real, construido para este propósito (ESP32, MPU6050, motorreductores con encoder, driver L298N en modo *brake*). Buena parte del valor del trabajo está, de hecho, en cómo se midieron esos parámetros y en los errores que hubo que descartar en el camino — se detalla en la sección 4.
+*Modo brake vs. coast: el L298N (puente H) puede dejar las salidas del motor en alta impedancia durante el tramo "apagado" del PWM (**coast**, decelera libre) o cortocircuitadas a masa (**brake**, frenado activo). Al mismo duty, brake entrega ~2.6× más torque — por eso el modelo usa parámetros medidos en brake.*
 
 ---
 
@@ -21,103 +25,99 @@ Este trabajo no usa un problema de juguete ni datos de ejemplo: **todos los par�
 
 ### 2.1 El robot como péndulo invertido — diagrama de cuerpo libre
 
-El robot se modela como un péndulo invertido montado sobre un eje de ruedas: la masa está distribuida a lo largo del cuerpo (motores cerca del pivote, batería en el extremo superior), y el sistema tiene un único grado de libertad relevante para este análisis — el ángulo de inclinación θ respecto de la vertical.
+El robot se modela como un péndulo invertido sobre un eje de ruedas: masa distribuida a lo largo del cuerpo (motores cerca del pivote, batería arriba), un grado de libertad relevante — el ángulo θ.
 
-```
-                    ╷ batería (extremo superior)
-                    │
-              θ →  ╱│  ← cuerpo del robot (26 cm)
-                  ╱ │
-                 ╱  │  ┄┄┄ vertical de equilibrio
-                ╱   │
-               ╱    │
-          ────●─────┴──── piso
-            eje de las
-             ruedas
-              (pivote)
+![Diagrama de cuerpo libre del péndulo invertido](dcl_pendulo.png)
 
-  Fuerzas sobre el cuerpo:
-    m·g      →  peso, aplicado en el centro de masa
-    N        →  reacción normal del piso, en el contacto rueda-piso
-    f        →  fuerza de tracción horizontal, en el contacto rueda-piso
-    τ_motor  →  torque de reacción del motor sobre el eje
-```
+El peso `m·g` (en el centro de masa, CG) se descompone, tomando la varilla pivote-CG como referencia, en **radial** (`m·g·cosθ`, sin brazo de palanca respecto al pivote, no genera torque) y **tangencial** (`m·g·sinθ`, sí tiene brazo de palanca — es la que produce el torque desestabilizante `m·g·l·sinθ`). La corrección la aporta `τ_motor`, transmitido al piso como una fuerza de **rozamiento estático** `f` (estático porque la rueda no patina — si patinara, no podría transmitir corrección). `N` es la reacción normal.
 
-Sobre el eje de las ruedas actúa el peso (que genera el torque desestabilizante, proporcional a sinθ) y el torque de reacción del motor (la única fuerza de corrección disponible). La fuerza de tracción en el contacto rueda-piso es la que efectivamente traslada el torque del motor en una aceleración angular del cuerpo — es el acoplamiento entre "cuánto le pido al motor" y "cuánto se endereza el robot", y es exactamente lo que el parámetro `K_U` del modelo representa.
+Separando ejes en el contacto rueda-piso: verticalmente hay equilibrio (`ΣFy=0`, `N≈m·g`), pero horizontalmente no (`ΣFx=f≠0`) — esa fuerza neta acelera al robot sobre el piso. Es la pista de que el eje de las ruedas **no es, en rigor, un pivote fijo**: se traslada. Este trabajo no modela esa traslación (licencia 2, abajo) — solo importa el ángulo — y por eso se puede medir `ω₀` colgando el robot de un pivote físicamente fijo (sección 4.7) y usar ese valor para el robot rodando: es la misma rotación alrededor del mismo eje.
 
 ### 2.2 Ecuación dinámica y las licencias que se toman al modelarlo
 
-La ecuación no lineal completa de un péndulo invertido incluye términos en sinθ, cosθ y acoplamientos con la dinámica de las ruedas. Se linealiza en torno a θ=0 (ángulos chicos, sinθ≈θ) y se colapsa toda la dinámica de traslación/acoplamiento rueda-cuerpo en dos constantes medibles directamente sobre el robot real:
+La ecuación no lineal completa incluye sinθ, cosθ y acoplamientos con las ruedas. Se linealiza en torno a θ=0 (sinθ≈θ) y se colapsa la dinámica de traslación/acoplamiento en dos constantes medibles sobre el robot real.
+
+**De dónde sale.** El análogo rotacional de F=m·a es Στ = J·θ″. Sobre el robot actúan el torque de la gravedad (`m·g·l·sinθ`, desestabilizante, sección 2.1) y el de reacción del motor (`τ_motor(u)`, corrector):
 
 ```
-θ'' = ω₀² · θ + K_U · u_efectivo
+J·θ″ = m·g·l·sinθ + τ_motor(u)
 ```
 
-- **ω₀** (rad/s): la tasa de inestabilidad — qué tan rápido crece el ángulo sin control. Sale de tratar al robot como un péndulo físico simple: `ω₀² = m·g·l / J`, con `l` la distancia del pivote al centro de masa y `J` el momento de inercia.
-- **K_U** (rad/s² por unidad de duty): la autoridad del actuador — cuánta aceleración angular de corrección produce una unidad de comando al motor.
-- **u_efectivo**: el comando PID después de pasar por las no linealidades reales del actuador (zona muerta, saturación) — sección 2.3.
+Linealizando y dividiendo por `J`: `θ″ = (m·g·l/J)·θ + τ_motor(u)/J`. El primer término define `ω₀² := m·g·l/J`; el segundo agrupa todo lo que depende del actuador en una constante medida, no derivada: `K_U·u_efectivo := τ_motor(u)/J`.
 
-**Licencias tomadas, explícitas:**
+**Por qué "ω₀" y no "una constante k".** Resolviendo la ecuación libre (`θ″=ω₀²θ`) con `θ=e^(rt)`: `r²=ω₀²`, `r=±ω₀` — raíces **reales** (a diferencia del péndulo colgante clásico, `θ″=-ω₀²θ`, con raíces imaginarias y solución oscilante de período `T=2π/ω₀`; es la misma constante `m·g·l/J`, solo cambia el signo según el lado del equilibrio — y es exactamente el método usado para medir `ω₀`: colgar el robot y cronometrar el período, sección 4.7). La solución `θ(t)=A·e^(ω₀t)+B·e^(-ω₀t)` diverge dominada por `e^(ω₀t)`: `ω₀` es la tasa de ese crecimiento (en `1/ω₀` s, la desviación se multiplica por `e≈2.72`).
 
-1. **Linealización.** Válida mientras θ se mantenga chico (el modelo se usa hasta ~3-8°, donde sinθ y θ difieren menos del 0.3%).
-2. **Un solo grado de libertad.** Se ignora la dinámica de las ruedas girando (no hay término de velocidad lineal del robot ni de las ruedas como estado separado) — el par motor se traduce directo en aceleración angular del cuerpo vía `K_U`, sin modelar el acoplamiento rueda-suelo-cuerpo por separado. Es razonable para evaluar la estabilización del ángulo en el corto plazo (segundos), que es lo que este trabajo optimiza; no sería suficiente para modelar desplazamiento del robot en el piso.
-3. **`K_U` agrupa toda la cadena de actuación** (motor, reductora, rueda, contacto con el piso, masa y geometría del robot) en una única constante, medida de punta a punta con una balanza en vez de derivada de parámetros individuales (constante de torque del motor, radio de rueda, etc.) — más simple y, sobre todo, **medible directamente** sin errores de propagación de cada parámetro intermedio.
-4. **Dos motores, tratados con una asimetría explícita, no promediados.** El robot tiene dos ruedas motrices que no son mecánicamente idénticas (sección 4.3) — en vez de promediarlas en un único actuador simétrico, el modelo representa la asimetría como una función escalón sobre `K_U` (sección 3.2).
+Con esas definiciones, la ecuación final:
+
+```
+θ″ = ω₀² · θ + K_U · u_efectivo
+```
+
+- **ω₀** (rad/s): tasa de inestabilidad (medido: 7.4 rad/s).
+- **K_U** (rad/s² por duty): autoridad del actuador.
+- **u_efectivo** (duty, -160 a 160): comando que efectivamente llega al motor — `u_pid` (2.4) después de zona muerta y saturación (2.3).
+
+**Licencias explícitas:**
+
+1. **Linealización**, válida hasta ~3-8° (sinθ y θ difieren <0.3%).
+2. **Un solo grado de libertad**: el modelo completo tiene θ y la posición sobre el piso (licencia de la sección 2.1); acá solo importa θ, no que el robot se quede fijo en un punto. La inercia rotacional de las ruedas y la condición de rodadura tampoco se modelan aparte — quedan absorbidas en `K_U` (licencia 3).
+3. **`K_U` agrupa toda la cadena de actuación** en una constante medida de punta a punta con balanza, evitando propagar error de cada parámetro intermedio.
+4. **Asimetría entre motores, explícita, no promediada** (sección 4.3) — función escalón sobre `K_U` (sección 3.2).
 
 ### 2.3 El actuador real: zona muerta y saturación
 
-Un PID de libro asume un actuador lineal sin límites. El motor real de este robot:
+- **Zona muerta**: el motor no responde por debajo de un umbral de duty (92 en M1, 102 en M2) — medido con balanza en todo el rango, no supuesto (sección 4.2/4.3).
+- **Saturación**: cap de seguridad 160/255, de una caracterización térmica del driver (brake, ventana ~60s antes de riesgo térmico) — no un número elegido para el PSO.
 
-- **No responde en absoluto** por debajo de un umbral de duty PWM (zona muerta, distinta para cada uno de los dos motores — sección 4.3).
-- **Nunca supera un cap de seguridad** de PWM, fijado por el driver y una ventana térmica operativa (sección 4.4).
-
-Si el PSO optimizara contra un actuador ideal, podría encontrar ganancias que en la simulación se ven perfectas pero que en el robot real piden correcciones que el motor jamás ejecuta. Por eso estas dos no linealidades están dentro del modelo simulado desde el principio.
+Si el PSO optimizara contra un actuador ideal, encontraría ganancias que en la simulación se ven perfectas pero que el motor real jamás ejecuta.
 
 ### 2.4 Control PID
-
-El controlador calcula el comando al motor como
 
 ```
 u_pid(t) = Kp·e(t) + Ki·∫e(t)dt + Kd·de(t)/dt
 ```
 
-con `e(t) = θ(t)` (el punto de equilibrio es θ=0). Cada término cumple un rol distinto: **Kp** reacciona al error presente, **Ki** elimina el error residual acumulado en el tiempo, **Kd** anticipa hacia dónde va el error y amortigua el sobreimpulso. Encontrar la combinación correcta de los tres a mano, sobre una planta con zona muerta y saturación (que vuelven el sistema no lineal), es exactamente el problema que se delega en PSO.
+con `e(t)=θ(t)`. **Kp** reacciona al error presente, **Ki** elimina el residual acumulado, **Kd** anticipa y amortigua el sobreimpulso. Encontrar los tres a mano sobre un sistema con zona muerta y saturación es exactamente lo que se delega en PSO.
 
 ### 2.5 Por qué PSO
 
-PSO optimiza una función de costo de caja negra (acá, el resultado de simular 4 segundos de dinámica no lineal) sin necesitar su derivada — la única alternativa clásica sin gradiente hubiera sido una búsqueda de grilla o aleatoria, mucho menos eficiente en 3 dimensiones continuas. Cada partícula es un punto (Kp, Ki, Kd); el enjambre converge combinando la inercia de cada partícula con la atracción hacia su mejor posición histórica y hacia la mejor posición global — sin necesitar calcular ninguna derivada de la función de costo, que en este caso ni siquiera es diferenciable (tiene una penalización discontinua, sección 3.3).
+PSO optimiza una función de costo de caja negra (4s de dinámica no lineal simulada) sin necesitar derivada — la alternativa sin gradiente sería una búsqueda de grilla/aleatoria, mucho menos eficiente en 3D continuas. Cada partícula es un punto (Kp, Ki, Kd); el enjambre converge combinando inercia, atracción a su mejor histórico y al mejor global — sin derivar una función que ni siquiera es diferenciable (penalización discontinua, sección 3.3).
 
 ---
 
 ## 3. PSO — implementación y características
 
-Implementado desde cero en NumPy puro (sin librerías de optimización), con la variante de **constricción de Clerc-Kennedy**:
+Implementado desde cero en NumPy puro, con la variante de **constricción de Clerc-Kennedy**:
 
 ```python
 chi = 2 / |2 - φ - sqrt(φ² - 4φ)|,   φ = φ1 + φ2 = 4.1
 
-v_i ← χ · (v_i + φ1·r1·(pbest_i − x_i) + φ2·r2·(gbest − x_i))
-x_i ← x_i + v_i
+v_i(t+1) = χ · (v_i(t) + φ1·r1·(pbest_i − x_i(t)) + φ2·r2·(gbest − x_i(t)))
+x_i(t+1) = x_i(t) + v_i(t+1)
 ```
 
-Se eligió sobre la variante clásica con límite de velocidad ajustado a mano porque el factor de constricción garantiza convergencia (matemáticamente, no por ensayo y error) sin ese hiperparámetro extra.
+`i` identifica a la partícula (fija en el tiempo), `t` a la generación — por eso `x_i` se actualiza a `x_i(t+1)`, no a `x_(i+1)` (otra partícula distinta). `x_i` es la posición `(Kp,Ki,Kd)`, `v_i` su velocidad, `pbest_i`/`gbest` la mejor posición propia/del enjambre, `φ1,φ2` los pesos cognitivo/social, `χ` el factor de constricción.
 
-**Configuración**: 25 partículas, 40 generaciones, semilla fija para reproducibilidad. Límites de búsqueda: Kp∈[0,3500], Ki∈[0,3000], Kd∈[0,800] — ampliados varias veces durante el desarrollo (sección 4.5) hasta confirmar que no estaban recortando el óptimo real.
+**Por qué constricción**: en la variante original (Kennedy y Eberhart, 1995) la velocidad puede crecer sin límite, disparando partículas fuera del espacio de búsqueda. La solución clásica es un `Vmax` ajustado a mano por ensayo y error. `χ` resuelve lo mismo con un análisis matemático de estabilidad, sin ese hiperparámetro extra. Con `φ=4.1` (estándar de la literatura), `χ≈0.7298`.
 
-### 3.1 Variables del robot real que entran al modelo — y cómo
+**Configuración**: 25 partículas, 40 generaciones, semilla fija. Límites: Kp∈[0,3500], Ki∈[0,3000], Kd∈[0,800] (ampliados durante el desarrollo, sección 4.4). Las 40 generaciones son iteraciones del optimizador, no tiempo simulado — cada evaluación corre 4s de dinámica (sección 3.3), dos escalas de tiempo distintas.
 
-| Parámetro | Valor | Rol en el modelo |
+### 3.1 Variables del robot real que entran al modelo
+
+| Parámetro | Valor | Rol |
 |---|---|---|
-| ω₀ | 7.4 rad/s | Tasa de inestabilidad — coeficiente del término θ en la dinámica |
-| K_U | 0.0218 rad/s² por duty | Autoridad del actuador — coeficiente del término de comando |
-| Zona muerta M1 / M2 | 92 / 102 duty | Umbral de la función escalón `k_u_efectivo` (sección 3.2) |
-| MAX_DUTY | 160 | Saturación del comando |
-| ESCENARIOS (ángulo) | 1.5° / 2.0° / 3.0° | Condiciones iniciales de la simulación — rango real medido |
-| ESCENARIOS (velocidad) | −0.15 / 0 / +0.15 rad/s | Condiciones iniciales — acotadas por el propio método de medición del ángulo |
+| ω₀ | 7.4 rad/s | Tasa de inestabilidad |
+| K_U | 0.0218 rad/s² por duty | Autoridad del actuador |
+| Zona muerta M1/M2 | 92/102 duty | Umbral de `k_u_efectivo` |
+| MAX_DUTY | 160 | Saturación |
+| ESCENARIOS (ángulo) | 1.5°/2.0°/3.0° | Rango real medido |
+| ESCENARIOS (velocidad) | −0.15/0/+0.15 rad/s | Acotado por el método de medición |
+
+Los ángulos cubren el rango real de perturbación (media 1.98°, peor caso 3.06°, n=22 — Test 10: parar el robot a mano, sin estímulo externo). Las velocidades salen del mismo test: solo captura una muestra con giroscopio <0.15 rad/s ("quieto"), así que ninguna muestra real supera esa velocidad en el instante que importa.
 
 ### 3.2 La asimetría entre motores, modelada como dos zonas muertas
 
-Los dos motores no son iguales: M1 empieza a responder en ~92/255 duty, M2 recién en ~102/255. Modelarlos con una única zona muerta sobre-simplifica la franja de 10 puntos donde un motor ya empuja y el otro todavía no. Se representa con una función de dos escalones:
+M1 responde desde ~92/255, M2 desde ~102/255. Una sola zona muerta ignora la franja de 10 puntos donde uno empuja y el otro no:
 
 ```python
 def k_u_efectivo(u_abs):
@@ -126,101 +126,99 @@ def k_u_efectivo(u_abs):
     else:                      return 1.0      # los dos motores
 ```
 
-`PROP_M1 = 0.575` sale de la razón de torque M2/M1 medida en el robot real (~0.74): M1 aporta `1/(1+0.74)` del total cuando es el único que está por encima de su umbral.
+`PROP_M1 = 0.575` sale de la razón de torque M2/M1 medida (~0.74): `1/(1+0.74)`.
 
 ### 3.3 Función de costo
 
-Variante de **ITAE** (Integral of Time-weighted Absolute Error): penaliza más el error que persiste en el tiempo que el error inicial, que es inevitable. Si el péndulo termina caído (>30° al final de la ventana de simulación), se suma una penalización fija de 500 — un controlador que no estabiliza no es "peor", es inválido.
+Variante de **ITAE** (Integral of Time-weighted Absolute Error, también llamada "aptitud"/"fitness" en la literatura — acá se minimiza, así que "mejor" es "menor"), con penalización de 500 si el péndulo termina caído (>30°):
 
 ```python
 costo = promedio_sobre_escenarios( Σ t·|θ(t)|·dt  +  500 si |θ_final| > 30° )
 ```
 
-**Se promedia sobre 9 escenarios** (3 ángulos × 3 velocidades iniciales), no uno solo — motivo detallado en la sección 4.2.
+Los dos números son deliberadamente holgados, no un ajuste fino: `30°` es ~10× la peor perturbación real (3.06°) y muy por fuera de donde vale la linealización. `500` domina el costo de cualquier trayectoria exitosa (ITAE típico 0.03-0.10) por más de 5000×, para que fallar un escenario nunca compita con ser un poco más lento en los otros ocho. Se promedia sobre 9 escenarios (3 ángulos × 3 velocidades), no uno solo (motivo en sección 4.1).
 
 ### 3.4 Resultados
 
-**Ganancias óptimas encontradas**: `Kp = 3500.00`, `Ki = 2297.02`, `Kd = 484.22`, costo final `55.60`.
-
-**Gráfico de convergencia** (`convergencia_pso.png`):
+**Ganancias óptimas**: `Kp=3500.00`, `Ki=2297.02`, `Kd=484.22`, costo final `55.5973`.
 
 ![Convergencia](convergencia_pso.png)
 
-La convergencia es casi inmediata (generación ~7) y luego plana. Esto es consistente con la forma del costo: como se explica en la sección 4.6, `Kp` no tiene óptimo interior en este modelo — el enjambre lo empuja al límite superior del espacio de búsqueda casi de inmediato, y una vez ahí, ajustar Ki y Kd es un problema mucho más simple y de convergencia rápida.
+*(panel derecho: el mismo dato, como excedente sobre el piso teórico en escala log — más claro para ver que los tres saltos de mejora, en generación ~1, ~2 y ~7, son reales)*
 
-**Respuesta temporal con las ganancias óptimas** (`respuesta_pid_optimo.png`), condición inicial θ₀=2° (la media real medida):
+La convergencia es casi inmediata (generación ~7) y luego plana, porque el costo tiene un **piso teórico**. El ITAE nunca es negativo, y el escenario 9 (θ=3°, v=+0.15 rad/s) paga la penalización de 500 sin importar las ganancias (límite físico del actuador, sección 4.6) — así que:
+
+```
+costo = (ITAE₁+...+ITAE₈+ITAE₉+500)/9 ≥ (0+...+0+500)/9 = 500/9 ≈ 55.56
+```
+
+El óptimo encontrado está a <0,1% de ese piso — casi no queda margen de mejora una vez resueltos los 8 escenarios fáciles (ITAE entre 0.026 y 0.041 cada uno; el noveno aporta 0.098 + la penalización completa; el promedio da exactamente 55.5973).
+
+**Cómo converge el enjambre, no solo el costo**: instrumentando una copia del algoritmo que guarda la posición de las 25 partículas por generación (mismo resultado verificado, 55.5973):
+
+![Convergencia del enjambre](convergencia_enjambre.png)
+
+Las partículas arrancan dispersas por todo el espacio y terminan agrupadas cerca del óptimo — en (Kp,Ki) migran al borde Kp=3500 (sección 4.5); en (Ki,Kd) se ve el embudo hacia (Ki≈2300, Kd≈480). Es la misma razón del piso teórico: la superficie de costo es casi plana lejos de la zona muerta, así que un punto de partida lejano no cuesta mucho más que uno cercano.
 
 ![Respuesta](respuesta_pid_optimo.png)
 
-El ángulo decae suavemente hacia 0°, y el comando al motor se mantiene siempre dentro del cap de seguridad (±160), oscilando cerca de la zona muerta — el patrón de conmutación *bang-bang* que se explica en la sección 4.6.
+Con θ₀=2° (la media real), el ángulo decae a 0° en ~3,5-4s. Dos detalles: (1) **no es que el motor tarde en reaccionar** — con Kp=3500 el comando cruza la zona muerta casi de inmediato, pero queda oscilando en su borde (patrón *bang-bang*, sección 4.5) en vez de ir a fondo de escala, así que la corrección promedio es "a media máquina"; (2) **el comando se ve siempre negativo** porque en esta trayectoria puntual θ nunca cruza el cero dentro de los 4s (`u_motor=-u_pid`) — no es una propiedad general.
 
-**Verificación escenario por escenario** (no solo el costo promedio — ver por qué en la sección 4.7): de los 9 escenarios de diseño, **8 estabilizan limpio**. Uno no — el peor caso combinado (3.0° con velocidad +0.15 rad/s) — y la sección 4.7 explica por qué eso es un límite físico real del actuador, no una falla del algoritmo.
+**Verificación escenario por escenario** (sección 4.6): de 9, **8 estabilizan limpio**. El que no — θ=3°, v=+0.15 rad/s — combina el peor ángulo medido con una velocidad que ya empeora esa posición (velocidad positiva con ángulo positivo = ya se está inclinando más). El controlador solo, con θ=3°, llega a tiempo (queda margen hasta el umbral de 3.65°, sección 4.6); con la velocidad sumada, el ángulo cruza ese umbral *antes* de que el controlador reaccione, y entra en la misma divergencia exponencial `e^(ω₀t)` derivada en 2.2 — sin vuelta atrás (termina en 60.158°, el tope de simulación). El escenario gemelo con v=−0.15 rad/s sí se resuelve: esa velocidad ya apunta hacia la vertical, a favor del controlador.
+
+### 3.5 Repetibilidad entre corridas independientes
+
+Repitiendo el entrenamiento 20 veces con semillas distintas:
+
+![Boxplot multi-semilla](boxplot_multiseed.png)
+
+El costo final es prácticamente idéntico (coef. de variación 0,002%) — consistente con estar pegado al piso teórico. `Kp` pega en 3500 en 19/20 corridas (la excepción, 3260, confirma que no hay óptimo interior — sección 4.5). `Ki` y `Kd` sí varían más entre semillas sin que el costo cambie: la superficie de costo es plana en esas direcciones, hay una franja ancha de combinaciones casi igual de buenas.
 
 ---
 
 ## 4. Inconvenientes encontrados y cómo se resolvieron
 
-Esta sección es, en varios sentidos, el contenido más sustancial del trabajo — el problema no fue "correr PSO" (eso es directo), fue construir un modelo cuyos parámetros y cuya función de costo representaran honestamente al sistema real, y detectar cuándo no lo estaban haciendo.
+El problema no fue "correr PSO" (directo), fue construir un modelo cuyos parámetros y función de costo representaran honestamente al sistema real, y detectar cuándo no lo hacían.
 
-### 4.1 Un artefacto numérico que parecía un resultado
+### 4.1 El costo de una sola condición inicial era engañoso
 
-La primera versión de la simulación integraba la física con Euler simple a 100 Hz y calculaba la derivada del PID como una diferencia finita cruda. Con el paso de integración chico, esa derivada amplifica el ruido de discretización por un factor `1/dt = 100`: ganancias casi idénticas (`Kd=82.72` vs. `83.00`, 0.3% de diferencia) daban resultados opuestos — una estabilizaba, la otra hacía caer el péndulo. El PSO estaba optimizando ruido numérico, no una propiedad real del sistema.
+Evaluar cada partícula con una única condición inicial dejaba el costo dominado por el ruido caótico de temporización de la zona muerta: cambios de 0.08% en `Kd` empeoraban el costo 6.6×. **Solución**: promediar sobre 9 escenarios — la sensibilidad local bajó de ~660% a ~15%.
 
-**Solución** (dos prácticas estándar de PID digital real): sub-pasos de integración de la física más finos que el muestreo del lazo de control, y un filtro pasa-bajos exponencial sobre la derivada antes de multiplicarla por `Kd`.
+### 4.2 Medir K_U: dos vías fallidas antes de la que funcionó
 
-### 4.2 El costo de una sola condición inicial era engañoso
+`K_U` no se mide con una regla. Inferirlo de la caída de tensión del L298N (multímetro) falló dos veces por método (asumir 0V en el tramo apagado del PWM; asumir una caída constante, que tampoco lo era — el driver degrada su salida al calentarse). Se midió **el torque directo con balanza**: con los dos motores conduciendo a la vez, el torque de cada uno cae 31-36% respecto de medirlo solo — el robot balancea con los dos activos siempre, así que ese es el número que corresponde, no el de un motor aislado.
 
-Aun con la física corregida, evaluar cada partícula con una única condición inicial dejaba el costo dominado por el ruido caótico de temporización de la zona muerta: el instante exacto en que el comando la cruza cambia toda la trayectoria posterior, y cambios de 0.08% en `Kd` empeoraban el costo 6.6×. El PSO se enganchaba a puntos "afortunados", no a controladores genuinamente mejores.
+### 4.3 La zona muerta no es un número — son dos, distintos
 
-**Solución**: promediar el costo sobre 9 escenarios (3 ángulos × 3 velocidades). La sensibilidad local bajó de ~660% a ~15%.
+La misma medición reveló que los motores no arrancan al mismo duty. El valor único usado antes ("al aire, sin carga") tampoco correspondía a la condición real, donde ambos umbrales suben (sección 3.2).
 
-### 4.3 Medir K_U: dos vías fallidas antes de la que funcionó
+### 4.4 El límite de búsqueda de Kp — y después el de Ki, y el de Kd
 
-`K_U` no se puede medir con una regla — es la autoridad de corrección de todo el sistema de actuación junto. El primer intento fue inferirlo de la caída de tensión del L298N con un multímetro. Falló dos veces por razones de método distintas: un modelo que asumía tensión cero en el tramo apagado del PWM, y después uno que asumía una caída constante que tampoco lo era (el driver degrada su propia salida al calentarse). Se abandonó la vía indirecta y se midió **el torque directo con una balanza**.
+`K_U` más chico que lo asumido sube el umbral teórico `Kp > ω₀²/K_U` de ~1827 a ~2512 — por encima del límite viejo del PSO (2000). Al ampliarlo, Kp volvió a pegarse al nuevo límite; al ampliar el de Ki, Ki encontró óptimo interior pero Kd se pegó al suyo; al ampliar Kd, los tres se estabilizaron (sección 4.5 explica por qué era esperable).
 
-Ahí apareció el hallazgo que más cambió el resultado: **con los dos motores conduciendo a la vez, el torque de cada uno cae 31-36% respecto de medirlo solo.** El robot balancea con los dos motores activos siempre — ese es el número que corresponde, no el de un motor aislado (que hubiera dado un `K_U` casi el doble de optimista, y unas ganancias PID afinadas para una planta que no existe).
+### 4.5 Por qué Kp no tiene óptimo interior en este modelo (y Ki, Kd sí)
 
-### 4.4 La zona muerta no es un número — son dos, distintos
+Con la zona muerta ocupando gran parte del rango, un error chico produce un comando que no mueve ningún motor. Mayor Kp cruza antes ese umbral — y como el comando además satura, subir Kp no tiene costo en este modelo, solo lo acerca a *bang-bang*, óptimo para ITAE. Un barrido confirma costo monótono decreciente, sin mínimo interior. Que Ki y Kd sí tengan óptimo interior confirma que el problema es específico de Kp: Ki muy grande genera sobreimpulso e integral *windup* (ITAE sí lo penaliza), igual Kd con el ruido de la derivada. **La función de costo está incompleta para Kp, no el resultado está mal** — un término que penalice la frecuencia de conmutación daría un óptimo con sentido físico (extensión natural del trabajo).
 
-La misma medición con balanza reveló que los dos motores no arrancan al mismo duty. Zona muerta 85 medida "al aire, sin carga" en versiones anteriores tampoco correspondía a la condición real (con carga, ambos umbrales suben). Se modela como se describe en 3.2.
+### 4.6 Un escenario no se resuelve — y confirma, por un camino independiente, el mismo límite medido con la balanza
 
-### 4.5 El límite de búsqueda de Kp — y después el de Ki, y el de Kd
-
-`K_U` más chico que el valor asumido originalmente sube el umbral teórico de estabilización lineal `Kp > ω₀²/K_U` de ~1827 a ~2512 — por encima del límite superior de búsqueda que tenía el PSO (2000). Al ampliarlo, `Kp` volvió a pegarse al nuevo límite; al ampliar el de `Ki` por el mismo motivo, `Ki` encontró un óptimo interior pero `Kd` se pegó al suyo; al ampliar el de `Kd`, por fin los tres (Kp en el límite, Ki y Kd interiores) se estabilizaron — sección 4.6 explica por qué era esperable que solo `Kp` se comportara así.
-
-### 4.6 Por qué `Kp` no tiene óptimo interior en este modelo (y `Ki`, `Kd` sí)
-
-Con la zona muerta ocupando gran parte del rango de duty disponible, un error chico cerca del equilibrio produce un comando que no llega a mover ningún motor. Cuanto mayor es `Kp`, antes cruza el comando ese umbral y antes arranca la corrección — y como el comando además satura, subir `Kp` no tiene ningún costo dentro de este modelo, solo lo acerca a un control *bang-bang*, que para ITAE es efectivamente óptimo. Un barrido explícito de `Kp` confirma que el costo baja de forma monótona, sin mínimo interior: no importa cuánto se suba el techo de búsqueda, `Kp` lo va a volver a ocupar.
-
-Que `Ki` y `Kd` sí encuentren óptimos interiores confirma que el problema es específico de cómo `Kp` interactúa con la zona muerta, no una propiedad general de "más ganancia siempre es mejor". `Ki` demasiado grande genera sobreimpulso e integral *windup*, que ITAE sí penaliza; lo mismo con `Kd` y el ruido de la derivada.
-
-**La conclusión honesta es que la función de costo está incompleta para Kp, no que el resultado esté mal.** Lo que en el robot real desaconsejaría un `Kp` tan agresivo —la conmutación constante cerca del equilibrio, con su desgaste mecánico y consumo— es exactamente lo que ITAE no mide. Un término que penalice la *frecuencia de conmutación* daría un óptimo interior con sentido físico. Queda como extensión natural del trabajo.
-
-### 4.7 Un escenario no se resuelve — y confirma, por un camino independiente, el mismo límite medido con la balanza
-
-Verificar escenario por escenario (no solo mirar el costo promedio) mostró que el escenario más exigente (3.0°, +0.15 rad/s — el peor ángulo real medido, moviéndose ya en la dirección que empeora, a la velocidad máxima que el propio método de medición admite como muestra válida) **termina en caída completa, sin importar cuánto se amplíen las tres ganancias.**
-
-No es falta de búsqueda: es un límite de autoridad del actuador, calculable directo con los parámetros medidos. Con el comando saturado al máximo, la aceleración de corrección disponible es `K_U·MAX_DUTY ≈ 3.49 rad/s²`; el término desestabilizante a 3° ya es `ω₀²·3° ≈ 2.87 rad/s²` — margen de apenas `0.62 rad/s²`, que se agota (margen cero) en:
+El escenario más exigente (3.0°, +0.15 rad/s) termina en caída completa sin importar cuánto se amplíen las ganancias. No es falta de búsqueda: es un límite de autoridad del actuador. Con el comando saturado, la corrección disponible es `K_U·MAX_DUTY≈3.49 rad/s²`; el término desestabilizante a 3° ya es `ω₀²·3°≈2.87 rad/s²` — margen de `0.62 rad/s²`, que se agota en:
 
 ```
 θ_umbral = K_U·MAX_DUTY / ω₀² ≈ 3.65°
 ```
 
-**Es, dentro de un 0.3%, el mismo 3.66° que había cerrado la medición directa de torque con la balanza esa misma noche**, por un camino completamente independiente (simulación linealizada a partir de ω₀ y K_U medidos por separado, contra torque medido directo). No es una coincidencia buscada: es la misma física, vista dos veces — la clase de consistencia que en este proyecto se aprendió a tratar como la validación más confiable que existe, más que la repetibilidad de una sola medición (sección 4.8).
+Dentro de un 0.3%, es el mismo 3.66° que había cerrado la medición directa de torque con balanza esa misma noche — dos caminos independientes (simulación vs. torque medido) al mismo número. No es coincidencia buscada: es la misma física, vista dos veces. El sistema físico, con este actuador, tiene un límite de perturbación recuperable apenas por encima del peor caso real medido — margen positivo (~20%) en general, sin margen solo en la combinación más severa de ángulo y velocidad simultáneos.
 
-La conclusión no es que el PSO haya fallado: es que el sistema físico, con este actuador y sin cambios de hardware, tiene un límite de perturbación recuperable, y ese límite está apenas por encima del peor caso real medido — con margen positivo (~20%) para el caso general, y sin margen solo en la combinación más severa simultánea de ángulo y velocidad.
+### 4.7 Una lección de método que se repitió tres veces
 
-### 4.8 Una lección de método que se repitió tres veces en el proyecto
-
-Antes de este trabajo, medir `ω₀` costó tres intentos: los dos primeros dieron valores estables y repetibles (dispersión de 0.8% y 1.5%) que resultaron ser de la cantidad equivocada — uno midió un sistema de dos péndulos acoplados sin saberlo, el otro midió el robot colgando de un brazo humano en vez de un pivote rígido. Lo que los distinguió del valor correcto no fue la dispersión — los tres eran repetibles — sino un chequeo físico de una línea: la longitud de péndulo equivalente `L_eq = g·(T/2π)²` tiene que ser del orden del tamaño del robot (26 cm). Solo el tercer valor (7.4 rad/s) lo cumple.
-
-El mismo patrón volvió a aparecer con `K_U` (dos modelos indirectos fallidos antes del correcto) y ahora con el escenario de la sección 4.7 (una consistencia física, no una repetición, es lo que valida el resultado). **La lección que se repite: la repetibilidad mide la estabilidad de un montaje, no la validez de lo que mide.** Lo que sí valida es un chequeo independiente, contra una física que tiene que cerrar.
+Medir `ω₀` costó tres intentos: los dos primeros, repetibles (dispersión 0.8% y 1.5%), medían la cantidad equivocada (un péndulo doble sin saberlo; el robot colgando de un brazo humano en vez de un pivote rígido). Lo que los distinguió del valor correcto no fue la dispersión, sino un chequeo físico de una línea: `L_eq = g·(T/2π)²` tiene que ser del orden del tamaño del robot (26 cm) — solo 7.4 rad/s lo cumple. El mismo patrón volvió con `K_U` y con el escenario 9. **La lección: la repetibilidad mide la estabilidad de un montaje, no la validez de lo que mide** — lo que valida es un chequeo independiente contra una física que tiene que cerrar.
 
 ---
 
 ## 5. Conclusiones
 
-- Se implementó PSO desde cero (constricción de Clerc-Kennedy) para optimizar un controlador PID sobre un modelo de péndulo invertido construido enteramente con datos medidos sobre un robot balanceador real, no supuestos.
-- El proceso de construir el modelo fue más largo y más instructivo que correr el algoritmo en sí: dos parámetros físicos (`ω₀`, `K_U`) y la función de costo pasaron por iteraciones de fallas de método identificadas y corregidas, todas documentadas con la causa raíz, no solo con el número final.
-- Las ganancias encontradas (`Kp=3500`, `Ki=2297.02`, `Kd=484.22`) estabilizan 8 de los 9 escenarios de diseño construidos a partir del rango real de perturbación medido en el robot. El escenario que no se resuelve no es un fallo del algoritmo — es un límite físico de torque del actuador, y la simulación lo reproduce de forma independiente casi exacta (3.65° vs. 3.66° medido con balanza), lo que da confianza en que el modelo, con todas sus licencias explícitas, captura la física que importa para este problema.
-- Queda como trabajo futuro: un término de costo que penalice la frecuencia de conmutación (para que `Kp` tenga un óptimo interior con sentido físico, no solo el límite de búsqueda), y validar las ganancias encontradas contra el robot físico una vez que el driver actual se reemplace por uno que amplíe el margen de torque disponible.
+- Se implementó PSO desde cero (constricción de Clerc-Kennedy) para optimizar un PID sobre un modelo de péndulo invertido construido enteramente con datos medidos, no supuestos.
+- Construir el modelo fue más largo e instructivo que correr el algoritmo: `ω₀`, `K_U` y la función de costo pasaron por fallas de método identificadas y corregidas con causa raíz documentada, no solo el número final.
+- Las ganancias encontradas (`Kp=3500`, `Ki=2297.02`, `Kd=484.22`) estabilizan 8 de 9 escenarios de diseño. El que no se resuelve no es un fallo del algoritmo — es un límite físico de torque, y la simulación lo reproduce de forma independiente casi exacta (3.65° vs. 3.66° medido), lo que da confianza en que el modelo captura la física que importa.
+- Trabajo futuro: un término de costo que penalice la frecuencia de conmutación (Kp con óptimo interior físico), y validar contra el robot real cuando el driver se reemplace por uno con más margen de torque.
