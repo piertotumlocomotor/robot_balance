@@ -1,0 +1,259 @@
+<title>Pruebas pre-energización — Robot Balanceador</title>
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f6f7f9;
+    --pwr:#b3261e; --pwr-bg:#fbeceb;
+    --logic:#1f5fa8; --logic-bg:#eaf1fb;
+    --warn:#8a6d00; --warn-bg:#fbf6dc;
+    --ok:#1f7a3d; --ok-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       padding:24px;font-size:15px;line-height:1.5;max-width:1000px;margin-inline:auto;}
+  h1{font-size:1.5rem;margin:0 0 4px;letter-spacing:-.01em;}
+  h2{font-size:1.05rem;margin:34px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--rule);}
+  h3{font-size:.92rem;margin:20px 0 8px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;}
+  .sub{color:var(--dim);font-size:.85rem;margin-bottom:16px;}
+  .stop{background:var(--pwr-bg);border:1px solid var(--pwr);border-left-width:4px;border-radius:4px;
+        padding:10px 14px;font-size:.85rem;margin:14px 0;color:var(--pwr);}
+  .note{background:var(--panel);border:1px solid var(--rule);border-left-width:4px;border-radius:4px;
+        padding:10px 14px;font-size:.85rem;color:var(--dim);margin:14px 0;}
+  .good{background:var(--ok-bg);border:1px solid var(--ok);border-left-width:4px;border-radius:4px;
+        padding:10px 14px;font-size:.85rem;margin:14px 0;}
+  .warn{background:var(--warn-bg);border:1px solid var(--warn);border-left-width:4px;border-radius:4px;
+        padding:10px 14px;font-size:.85rem;margin:14px 0;}
+  .stop b,.note b,.good b,.warn b{color:var(--ink);}
+  table{border-collapse:collapse;width:100%;font-size:.84rem;margin:10px 0;}
+  th,td{border:1px solid var(--rule);padding:6px 9px;text-align:left;vertical-align:top;}
+  th{background:var(--panel);font-weight:600;font-size:.76rem;text-transform:uppercase;
+     letter-spacing:.03em;color:var(--dim);}
+  code{font-family:var(--mono);font-size:.86em;background:var(--panel);padding:1px 4px;border-radius:3px;}
+  .box{display:inline-block;width:13px;height:13px;border:1.5px solid var(--dim);border-radius:2px;
+       vertical-align:-1px;margin-right:2px;}
+  .stage{background:var(--logic-bg);border:1px solid var(--logic);border-radius:5px;
+         padding:8px 12px;font-size:.8rem;color:var(--logic);font-weight:600;margin:0 0 10px;}
+  footer{color:var(--faint);font-size:.75rem;margin-top:36px;padding-top:10px;border-top:1px solid var(--rule);}
+  @media print{
+    body{padding:10mm;font-size:11px;max-width:none;}
+    .stop,.note,.good,.warn,th,.stage{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    h2{page-break-after:avoid;} table{page-break-inside:avoid;}
+    @page{size:A4 portrait;margin:10mm;}
+  }
+</style>
+
+<h1>Pruebas pre-energización — robot rearmado</h1>
+<div class="sub">
+  Creado 2026-09-13 · protoboard rearmado 2026-09-12 · 2× BTS7960 · Buck nuevo 5.01V ·
+  a ejecutar <b>antes</b> de V3 y antes de medir <code>K_U</code>
+</div>
+
+<div class="stop">
+  <b>⛔ Por qué existe este documento.</b> Este robot ya falló <b>tres veces</b> con el mismo
+  síntoma ("el firmware reporta todo bien y ningún motor se mueve": pin lógico sin alimentar,
+  sin GND común, switch en OFF), <b>perdió un Buck, dos capacitores y un fusible</b> por
+  polaridad invertida, y el 2026-09-12 se armó un <b>lazo de masa</b> que solo se detectó
+  cruzando documentación. El cableado es nuevo de punta a punta y hay <b>dos cambios que
+  nunca se probaron</b>: el reordenamiento M1→derecha / M2→izquierda y el paso de
+  <code>RPWM</code> M1 de <code>P14</code> a <code>P19</code>.
+</div>
+
+<div class="note">
+  <b>Orden y criterio.</b> Las etapas van de lo más barato y seguro a lo más riesgoso, y cada
+  prueba está pensada para que <b>solo pueda fallar por un motivo</b>. No saltear etapas: la
+  gracia es que cuando algo falle, ya sepas qué es.
+  <br><br>
+  <b>Multímetro en modo Ω, no en continuidad/beep.</b> El beep dispara con cualquier cosa por
+  debajo de ~20-50Ω y no distingue nada a esa escala — es la lección 4 del proyecto.
+</div>
+
+<h2>Etapa 0 · Sin batería · multímetro en Ω</h2>
+<div class="stage">BATERÍA DESCONECTADA (XT60 fuera) · SWITCH EN OFF · nada energizado</div>
+
+<h3>0.1 — Polaridad del tramo hacia el Buck</h3>
+<div class="stop">
+  <b>Esta es la prueba que se saltó el 2026-09-10 y costó un Buck, dos capacitores y el
+  fusible.</b> Hacerla siempre, sin importar cuántas veces haya salido bien — lección 11.
+</div>
+<p>Con el XT60 <b>desenchufado</b>, medir continuidad desde el pin <code>+</code> del conector
+de batería hacia cada uno de los dos cables que llegan a la bornera <code>IN</code> del Buck.</p>
+<table>
+  <tr><th style="width:34%">Medición</th><th style="width:26%">Esperado</th><th>Si falla</th></tr>
+  <tr><td><span class="box"></span> XT60 <code>+</code> ↔ cable en <code>IN+</code></td><td>continuidad</td><td rowspan="2"><b>Están invertidos.</b> Corregir antes de seguir. No confiar en el color del cable — el proyecto no usa código de colores a propósito.</td></tr>
+  <tr><td><span class="box"></span> XT60 <code>−</code> ↔ cable en <code>IN−</code></td><td>continuidad</td></tr>
+</table>
+
+<h3>0.2 — Las 6 pull-downs de seguridad</h3>
+<p>De cada línea de señal al riel <code>−</code>. Valida a la vez que la resistencia está puesta
+<b>y</b> que está en la fila correcta.</p>
+<table>
+  <tr><th style="width:30%">Línea</th><th style="width:16%">Fila / R</th><th style="width:18%">Esperado</th><th>Lectura</th></tr>
+  <tr><td><span class="box"></span> <code>EN</code> M1 (<code>R_EN</code>+<code>L_EN</code>)</td><td>f.10 / J10</td><td>≈10kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>LPWM</code> M1</td><td>f.8 / J8</td><td>≈10kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M1</td><td>f.6 / J6</td><td>≈10kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>EN</code> M2</td><td>f.9 / A9</td><td>≈10kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>LPWM</code> M2</td><td>f.7 / A7</td><td>≈10kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M2</td><td>f.5 / A5</td><td>≈10kΩ</td><td></td></tr>
+</table>
+<div class="warn">
+  <b>Cómo leer un resultado raro:</b> <b>abierto</b> = falta la resistencia o está en la fila
+  equivocada. <b>≈5kΩ</b> = hay dos en paralelo (una quedó en una fila que comparte nodo).
+  La referencia histórica de las 4 viejas era <b>9.9kΩ</b> medidos.
+</div>
+
+<h3>0.3 — Continuidad punta a punta ESP32 → pin del driver</h3>
+<div class="note">
+  Es el <b>punto 4 del checklist de V1, que quedó pendiente</b>. Medir <b>en el pin del ESP32</b>
+  y <b>en el pin del header del módulo</b>, no en la fila del protoboard — el objetivo es
+  justamente detectar un contacto flojo de protoboard, que es lo que ya arruinó el enlace UART
+  del ESP8266 y el jumper de VIN de §3.2.
+</div>
+<table>
+  <tr><th style="width:24%">Pin ESP32</th><th style="width:30%">Pin del módulo</th><th style="width:16%">Esperado</th><th>✓</th></tr>
+  <tr><td><span class="box"></span> <code>P27</code></td><td>IBT-2 #1 <code>R_EN</code> y <code>L_EN</code></td><td>continuidad a <b>los dos</b></td><td></td></tr>
+  <tr><td><span class="box"></span> <b><code>P19</code></b></td><td>IBT-2 #1 <code>RPWM</code></td><td>continuidad</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P13</code></td><td>IBT-2 #1 <code>LPWM</code></td><td>continuidad</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P4</code></td><td>IBT-2 #2 <code>R_EN</code> y <code>L_EN</code></td><td>continuidad a <b>los dos</b></td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P16</code></td><td>IBT-2 #2 <code>RPWM</code></td><td>continuidad</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P17</code></td><td>IBT-2 #2 <code>LPWM</code></td><td>continuidad</td><td></td></tr>
+</table>
+<div class="stop">
+  <b><code>P14</code> tiene que estar LIBRE.</b> Verificar que no sale ningún cable de ese pin.
+  <code>RPWM</code> M1 se movió a <code>P19</code> porque <code>P14</code> saca señal durante el
+  boot del ESP32 — misma regla que <code>P5</code>: no usarlo para nada que mueva un motor.
+</div>
+
+<h3>0.4 — Ausencia de cruces</h3>
+<p>Pares que <b>tienen que ser nodos distintos</b>. Es la prueba que caza el reordenamiento
+M1/M2 mal hecho, y el equivalente del "ENA vs IN1" que ya se usó en §3.2.</p>
+<table>
+  <tr><th style="width:46%">Par</th><th style="width:20%">Esperado</th><th>Qué detecta si falla</th></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>LPWM</code> M1</td><td>abierto</td><td>Las dos mitades del puente en corto → el motor nunca gira</td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M2 ↔ <code>LPWM</code> M2</td><td>abierto</td><td>Ídem en M2</td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>RPWM</code> M2</td><td>abierto</td><td><b>Cruce entre lados</b> — el riesgo nuevo del reordenamiento</td></tr>
+  <tr><td><span class="box"></span> <code>EN</code> M1 ↔ <code>EN</code> M2</td><td>abierto</td><td>Los dos drivers habilitados por el mismo GPIO</td></tr>
+  <tr><td><span class="box"></span> Cualquier señal ↔ riel 5V</td><td>abierto</td><td>Señal pegada a 5V: el driver arrancaría solo</td></tr>
+  <tr><td><span class="box"></span> Riel 5V ↔ riel <code>−</code></td><td>abierto</td><td>Corto de alimentación</td></tr>
+</table>
+
+<h3>0.5 — Riel de 3V3: el valor esperado NO es "abierto"</h3>
+<table>
+  <tr><th style="width:34%">Medición</th><th style="width:26%">Esperado</th><th>Interpretación</th></tr>
+  <tr><td><span class="box"></span> 3V3 (f.3 o f.12) ↔ riel <code>−</code></td><td><b>≈135kΩ</b></td><td>Ya medido el 2026-09-12 (§7.25). No es fuga anómala: es el MPU6050 y los encoders compartiendo ese nodo (pull-ups de I2C y diodos de protección). <b>Si diera abierto</b>, el MPU o los encoders no están realmente conectados al 3V3.</td></tr>
+  <tr><td><span class="box"></span> <code>EN</code> del ESP32 (f.13) ↔ riel <code>−</code></td><td>abierto</td><td>Es la lectura limpia de C_en, que es un cerámico aislado. Un valor bajo = fila mal identificada.</td></tr>
+</table>
+
+<h3>0.6 — Masa de los drivers</h3>
+<table>
+  <tr><th style="width:40%">Medición</th><th style="width:20%">Esperado</th><th>Nota</th></tr>
+  <tr><td><span class="box"></span> <code>B−</code> de cada IBT-2 ↔ soldadura <code>−</code></td><td>continuidad</td><td>Es el <b>único</b> camino de masa del driver (V1)</td></tr>
+  <tr><td><span class="box"></span> <code>GND</code> del header desconectado del riel lógico</td><td>verificación <b>visual</b></td><td>⚠️ <b>No se puede testear con el multímetro:</b> <code>B−</code> y el <code>GND</code> del header son la misma pista dentro del módulo, y <code>B−</code> sí está conectado — así que va a dar continuidad igual. Confirmar a ojo que el cable está fuera.</td></tr>
+  <tr><td><span class="box"></span> Cables sueltos (<code>GND</code> header, <code>R_IS</code>, <code>L_IS</code>)</td><td>aislados <b>y con brida</b></td><td>Aislar no alcanza: un conductor suelto en un robot que se va a caer durante el entrenamiento de RL puede tocar <code>B+</code></td></tr>
+</table>
+
+<h3>0.7 — Motores y encoders</h3>
+<table>
+  <tr><th style="width:40%">Medición</th><th style="width:20%">Esperado</th><th>Si falla</th></tr>
+  <tr><td><span class="box"></span> <code>M+</code> ↔ <code>M−</code> en la bornera de cada driver</td><td><b>≈3.5Ω</b></td><td>Abierto = cable cortado o bornera floja. Es el bobinado, medido en §7.1</td></tr>
+  <tr><td><span class="box"></span> Encoder: <code>VCC</code> ↔ <code>GND</code> de cada uno</td><td>no corto</td><td>Corto = cable pinchado</td></tr>
+</table>
+
+<h2>Etapa 1 · Primera energización · MOTORES DESCONECTADOS</h2>
+<div class="stage">DESCONECTAR <code>M+</code>/<code>M−</code> DE LAS DOS BORNERAS antes de dar llave</div>
+
+<div class="good">
+  <b>Por qué desconectar los motores.</b> Con los motores fuera, ni una falla total de lógica
+  puede mover el robot. Cuesta cuatro tornillos y elimina por completo el riesgo de esta etapa
+  — que es la primera vez que este cableado ve 12V.
+</div>
+
+<table>
+  <tr><th style="width:40%">Medición</th><th style="width:20%">Esperado</th><th>Si falla</th></tr>
+  <tr><td><span class="box"></span> Switch V+ en <b>ON</b></td><td>—</td><td>Tercera causa histórica del síntoma "no se mueve nada"</td></tr>
+  <tr><td><span class="box"></span> <code>B+</code> IBT-2 <b>#1</b> vs GND de potencia</td><td>≈12V</td><td rowspan="2">Cubre switch, fusible, batería y soldadura de una sola medición. <b>Son DOS entradas, medir las dos</b> — no alcanza con una</td></tr>
+  <tr><td><span class="box"></span> <code>B+</code> IBT-2 <b>#2</b></td><td>≈12V</td></tr>
+  <tr><td><span class="box"></span> <code>VCC</code> IBT-2 <b>#1</b></td><td>≈5V</td><td rowspan="2">Sin esto la lógica del driver no conmuta nada aunque el firmware reporte bien — el bug de §7.6, que ya pasó tres veces</td></tr>
+  <tr><td><span class="box"></span> <code>VCC</code> IBT-2 <b>#2</b></td><td>≈5V</td></tr>
+  <tr><td><span class="box"></span> Buck <code>OUT+</code> bajo carga</td><td><b>5.01V</b></td><td>Si cae mucho, el Buck no sostiene el consumo. Valor de la unidad nueva; el 4.98V era la destruida</td></tr>
+  <tr><td><span class="box"></span> <code>VIN</code> del ESP32 (f.30-B)</td><td>4.8–5.0V</td><td><b>Una lectura intermedia tipo 0.7V = circuito abierto con fuga</b>, no conexión parcial. Es exactamente cómo falló el jumper de VIN en §3.2</td></tr>
+  <tr><td><span class="box"></span> <code>3V3</code> del ESP32 (f.3/f.12)</td><td>3.2–3.4V</td><td>Si está bajo, revisar el margen de dropout del regulador interno</td></tr>
+</table>
+
+<h3>1.1 — La prueba más importante de todas: las pull-downs en condición real</h3>
+<div class="stop">
+  Con el ESP32 <b>alimentado pero sin firmware de motores corriendo</b> (o directamente sin
+  flashear), medir <b>cada una de las 6 líneas de señal contra GND</b>.
+  <br><br>
+  <b>Las 6 tienen que estar en ~0V.</b> Esto es lo único que garantiza que si el ESP32 se cuelga
+  o se resetea, los motores no arrancan solos. Si alguna mide distinto de 0V, <b>no seguir</b>:
+  la protección por hardware no está funcionando.
+</div>
+
+<table>
+  <tr><th style="width:40%">Chequeo</th><th style="width:20%">Esperado</th><th>Nota</th></tr>
+  <tr><td><span class="box"></span> Las 6 líneas de señal vs GND</td><td><b>~0V</b></td><td>Ver recuadro de arriba</td></tr>
+  <tr><td><span class="box"></span> Temperatura tras 1 min: los 2 módulos y el Buck</td><td>frío / tibio</td><td>Algo caliente con los motores desconectados = corriente que no debería existir. Cortar.</td></tr>
+</table>
+
+<h2>Etapa 2 · ESP32 corriendo · motores todavía desconectados</h2>
+<div class="stage">MOTORES AÚN FUERA · solo sensores y verificación de mapeo</div>
+
+<table>
+  <tr><th style="width:34%">Prueba</th><th style="width:26%">Esperado</th><th>Por qué</th></tr>
+  <tr><td><span class="box"></span> <code>esp_reset_reason()</code> al arrancar</td><td>no <code>ESP_RST_BROWNOUT</code> (6)</td><td><b>Nunca se hizo</b> y está sugerido desde hace tiempo. Si da brownout, el riel se hunde — y explicaría el pendiente del AP que se cae con batería sola</td></tr>
+  <tr><td><span class="box"></span> Test 0 — scanner I2C</td><td>MPU en <code>0x68</code></td><td>Distingue "no hay nadie" de "está en otra dirección"</td></tr>
+  <tr><td><span class="box"></span> <b><code>VCC</code> del MPU con multímetro</b></td><td>≈3.3V</td><td>⚠️ <b>Que conteste por I2C NO prueba que esté alimentado</b> — puede vivir de los diodos de protección de SDA/SCL a ~µA. Costó varias horas en §7.13. Medirlo, o mirar el LED del módulo</td></tr>
+  <tr><td><span class="box"></span> Test 3 — girar las ruedas <b>a mano</b></td><td>4 canales cuentan; M1 y M2 dan <b>signo opuesto</b></td><td>Valida los 4 canales sin energizar motores. El signo opuesto es por diseño (montaje en espejo)</td></tr>
+</table>
+
+<h3>2.1 — Verificación de mapeo de señal, sin mover nada</h3>
+<div class="note">
+  <b>La prueba que cierra definitivamente el riesgo del reordenamiento.</b> Poner cada una de las
+  6 líneas en alto <b>de a una</b> y medir en el pin del header del módulo correspondiente. Con
+  los motores desconectados no hay consecuencia posible, y se verifica el mapeo completo —
+  incluido que <code>P19</code> llegue al <code>RPWM</code> de M1 y no a otro lado.
+  <br><br>
+  ✅ <b>Sketch listo: <code>test/test12_mapeo_senales_esp32/</code></b> (creado 2026-09-13, compila
+  OK). Menú por Serial a 115200: <code>1</code>–<code>6</code> pone una línea en alto a la vez e
+  imprime dónde poner la punta del multímetro y qué esperar; <code>0</code> vuelve al estado
+  seguro. <b>Nunca hay más de una línea en alto</b>, y por la tabla de verdad del BTS7960 una sola
+  no puede hacer girar nada (<code>EN</code> solo = brake; <code>RPWM</code>/<code>LPWM</code> solo
+  con <code>EN</code>=0 = stand-by) — igual correrlo con los motores desconectados.
+  <br><br>
+  <b>Bonus: el modo <code>z</code> hace la prueba de la Etapa 1.1.</b> Pone los 6 GPIO en alta
+  impedancia (<code>INPUT</code>), o sea <b>simula un ESP32 colgado</b>, y ahí las 6 líneas tienen
+  que medir ~0V sostenidas solo por las pull-downs externas. Medirlas en Ω no prueba eso; esto sí.
+  El sketch además imprime <code>esp_reset_reason()</code> al arrancar, que es otro ítem de la
+  Etapa 2.
+</div>
+
+<h2>Etapa 3 · Motores conectados · primer movimiento</h2>
+<div class="stage">RUEDAS EN EL AIRE · un motor por vez · duty bajo</div>
+
+<div class="stop">
+  <b>⚠️ El cap de PWM es 121, NO 160.</b> El 160 se calibró contra los BJT del L298N, que se
+  comían varios volts. El BTS7960 es MOSFET (R_ON 7–10 mΩ): al mismo duty le llega bastante más
+  tensión al motor. Arrancar en 121 y no subirlo sin medir.
+</div>
+
+<table>
+  <tr><th style="width:34%">Prueba</th><th style="width:26%">Esperado</th><th>Nota</th></tr>
+  <tr><td><span class="box"></span> Test 11 — bring-up BTS7960, M1 solo</td><td>gira, sin humo, sin calor</td><td>Sus <code>#define</code> se corrigieron el 2026-09-13 (<code>M1_RPWM</code> 14→19)</td></tr>
+  <tr><td><span class="box"></span> Test 11 — M2 solo</td><td>ídem</td><td></td></tr>
+  <tr><td><span class="box"></span> Sentido de giro de cada motor</td><td>el esperado</td><td>Al recablear a <code>M+</code>/<code>M−</code> se perdió la corrección de OUT1/OUT2 que se había hecho para M1 — puede hacer falta invertir de nuevo</td></tr>
+  <tr><td><span class="box"></span> Signo del encoder vs. sentido comandado</td><td>coherente</td><td>Cierra el lazo sensor↔actuador</td></tr>
+</table>
+
+<div class="good">
+  <b>Recién después de esto</b>: medir <b>coast vs. brake</b> en el BTS7960 con balanza (hoy es
+  solo inferencia de datasheet, §8.7, y mueve <code>K_U</code> por un factor ~2.7), y después el
+  barrido de <code>K_U</code> con los <b>dos motores en brake conduciendo a la vez</b> — la
+  condición real, no un motor aislado. Con eso sale <code>θ_umbral</code> vigente.
+</div>
+
+<footer>
+  Robot Balanceador — creado 2026-09-13. Complementa el checklist de §8.8 del registro y el de
+  "Checklist antes de cualquier prueba que mueva motores" de <code>CLAUDE.md</code>, adaptados al
+  cableado rearmado del 2026-09-12. Filas del protoboard: <code>conexiones-registro-pruebas.md</code> §3.1b.
+</footer>

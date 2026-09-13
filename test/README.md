@@ -38,6 +38,11 @@ Decisiones de diseño y límites: [`../CLAUDE.md`](../CLAUDE.md).
 
 ## Estado
 
+> ⭐ **Test 12 (nuevo, 2026-09-13)** — `test12_mapeo_senales_esp32/`: verificación de mapeo de
+> señales y de las pull-downs, con los motores desconectados. Es la Etapa 2.1 de
+> [`../docs/plan-pruebas-pre-energizacion.html`](../docs/plan-pruebas-pre-energizacion.html),
+> el protocolo a correr **antes** de energizar y antes de medir `K_U`.
+
 **Vigentes (ESP32, FQBN `esp32:esp32:nodemcu-32s`):**
 
 | Test | Sketch | Reporte | Compila | Flasheado |
