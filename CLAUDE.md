@@ -1542,6 +1542,31 @@ sensor y de la mecánica, no del microcontrolador.
 
 ## Estado del diseño / Pendientes abiertos
 
+### 🎯 Próximo paso inmediato (cierre de sesión 2026-09-13)
+
+**Mañana: correr la Etapa 0 de [`docs/plan-pruebas-pre-energizacion.html`](docs/plan-pruebas-pre-energizacion.html)** — verificación de continuidad con la batería desconectada, antes de energizar nada.
+
+El robot está **cableado pero nunca energizado con este cableado**. Orden a seguir, sin saltear:
+
+| # | Paso | Dónde |
+|---|---|---|
+| 1 | **Etapa 0** — continuidad sin batería: polaridad al Buck, las 6 pull-downs, mapa punto a punto ESP32↔drivers/encoders/MPU (§0.3a–d), ausencia de cruces | `plan-pruebas-pre-energizacion.html` |
+| 2 | **Etapa 1** — primera energización **con los motores desconectados**; incluye verificar que las 6 señales midan ~0V | ídem |
+| 3 | **Etapa 2** — `esp_reset_reason()`, Test 0 (I2C), `VCC` del MPU con multímetro, Test 3 girando ruedas a mano, y **Test 12** para el mapeo de señales | ídem + `test/test12_mapeo_senales_esp32/` |
+| 4 | **Etapa 3** — primer movimiento, ruedas en el aire, **cap 121** | ídem |
+| 5 | **V3** del plan de cableado — queda cubierta por la Etapa 1 | `plan-cableado-senales.html` |
+| 6 | **Medir coast vs. brake** en el BTS7960 con balanza — hoy es inferencia de datasheet (8.7) y mueve `K_U` por ~2.7× | registro 8.7 |
+| 7 | **Medir `K_U`** (balanza, dos motores en brake a la vez) y **re-correr el PSO** | registro 8.6 / 7.17 |
+
+⚠️ **Dos cambios de cableado que nunca se probaron** y que la Etapa 0 existe para validar:
+el reordenamiento **M1 → lado derecho (F–J) / M2 → lado izquierdo (A–E)** del protoboard, y el
+paso de **`RPWM` M1 de GPIO14 a GPIO19** (el 14 saca señal en el boot).
+
+⏳ **Dato que falta registrar**: las **filas exactas de los 4 canales de encoder** en el
+protoboard rearmado — en el registro §3.1b están como "columna A, filas sin especificar".
+Anotarlas al hacer la Etapa 0.3b.
+
+
 **Migración a ESP32:**
 - [x] Evaluación de disponibilidad de pines — 12 GPIO necesarios, holgado en un ESP32 de 38 pines.
 - [x] Mapeo de pines definido.
