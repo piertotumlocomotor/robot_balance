@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plantilla imprimible — Nivel 1 (150mm)</title>
+<meta name="description" content="Plantilla a escala real 1:1 del Nivel 1 (drivers BTS7960 + MPU6050), ajustada a 150mm por el corte real del listón.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f4f5f8;
+    --power:#8a6d00; --power-bg:#fbf6dc;
+    --danger:#b3261e; --danger-bg:#fbeceb;
+    --used:#1f7a3d; --used-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:10mm; font-size:12px; line-height:1.35;
+  }
+  h1{font-size:1.05rem; margin:0 0 2mm;}
+  .sub{color:var(--dim); font-size:.72rem; margin-bottom:3mm;}
+
+  .warn{
+    background:var(--danger-bg); border:1px solid var(--danger); border-radius:4px;
+    padding:2mm 3mm; font-size:.74rem; color:var(--danger); margin-bottom:4mm; font-weight:600;
+  }
+  .note{
+    background:var(--panel); border:1px solid var(--rule); border-radius:4px;
+    padding:2mm 3mm; font-size:.68rem; color:var(--dim); margin-bottom:4mm;
+  }
+
+  .layout{display:flex; gap:8mm; align-items:flex-start;}
+
+  /* ---- Zona de escala real: TODO acá adentro está en mm físicos exactos ---- */
+  .stage{
+    position:relative; width:76mm; height:150mm;
+    border:0.4mm solid var(--ink); background:#fff; flex-shrink:0;
+  }
+  .stage .patch{
+    position:absolute; width:14mm; height:14mm;
+    border:0.35mm dashed var(--power); box-sizing:border-box;
+  }
+  .stage .hole{
+    position:absolute; width:5.3mm; height:5.3mm; border-radius:50%;
+    border:0.35mm solid var(--ink); box-sizing:border-box;
+  }
+  .stage .hole::before, .stage .hole::after{
+    content:""; position:absolute; background:var(--ink);
+  }
+  .stage .hole::before{ left:2.55mm; top:0mm; width:0.2mm; height:5.3mm; }
+  .stage .hole::after{ left:0mm; top:2.55mm; width:5.3mm; height:0.2mm; }
+  .stage .cutout{
+    position:absolute; width:50mm; height:32mm; left:13mm;
+    border:0.4mm solid var(--danger); box-sizing:border-box;
+    background:repeating-linear-gradient(45deg, var(--danger-bg), var(--danger-bg) 3px, #fff 3px, #fff 6px);
+    display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .stage .cutout span{font-family:var(--mono); font-size:5.3px; color:var(--danger); line-height:1.3;}
+  .stage .mpuzone{
+    position:absolute; width:46mm; height:34.5mm; left:15mm;
+    border:0.35mm dashed var(--used); box-sizing:border-box;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .stage .mpuzone span{font-family:var(--mono); font-size:5.3px; color:var(--used); line-height:1.3;}
+  /* ---- fin zona de escala real ---- */
+
+  .side{width:70mm;}
+  .calib{
+    width:50mm; height:0; border-top:0.4mm solid var(--ink); position:relative; margin:6mm 0 2mm;
+  }
+  .calib::before, .calib::after{
+    content:""; position:absolute; top:-2mm; width:0.3mm; height:4mm; background:var(--ink);
+  }
+  .calib::before{left:0;}
+  .calib::after{right:0;}
+  .calib-label{font-family:var(--mono); font-size:.68rem; color:var(--ink); margin-bottom:5mm;}
+
+  .legend{font-size:.68rem; color:var(--dim); display:flex; flex-direction:column; gap:1.5mm;}
+  .legend b{color:var(--ink);}
+
+  footer{color:var(--faint); font-size:.62rem; margin-top:6mm; padding-top:2mm; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:8mm;}
+    .warn, .note{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .stage .patch, .stage .hole, .stage .driver, .stage .mpu{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    @page{ size:A4 portrait; margin:10mm; }
+  }
+</style>
+</head>
+<body>
+<div style="background:#fbeceb;border:3px solid #b3261e;border-radius:6px;padding:14px 18px;margin:0 0 22px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#181c24;line-height:1.5">
+  <div style="font-size:1.05rem;font-weight:800;color:#b3261e;margin-bottom:6px">&#9940; DOCUMENTO DEPRECADO &mdash; PLANTA VIEJA</div>
+  <p style="margin:6px 0;font-size:.9rem">
+    Describe el robot <b>anterior al rearmado</b>: la arquitectura de <b>recortes de disipador</b> en N1 con drivers y MPU compartiendo nivel, superada el 2026-08-28. Ese robot <b>ya no existe</b>.
+  </p>
+  <p style="margin:6px 0;font-size:.9rem">
+    <b>No usar para cablear, construir ni calcular.</b> Se conserva solo para repasar errores
+    y decisiones de esa etapa.
+  </p>
+  <p style="margin:6px 0 0;font-size:.85rem;color:#4b5563">
+    Documentaci&oacute;n vigente: <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code>
+    (filas del protoboard en <b>&sect;3.1b</b>). Planos vigentes: <code>docs/plano-potencia.html</code>,
+    <code>docs/plano-senales.html</code>, <code>docs/plano-distribucion-niveles.html</code>,
+    <code>docs/plantilla-imprimible-niveles.html</code>.
+  </p>
+</div>
+
+
+<h1>Plantilla imprimible — Nivel 1</h1>
+<div class="sub">Escala real 1:1 · 76×150mm (corte real) · drivers BTS7960 montados abajo, disipadores asomando por recortes · MPU6050 sobre protoboard arriba</div>
+
+<div class="warn">
+  IMPRIMIR A ESCALA 100% ("Tamaño real") — NO "Ajustar a la página". Verificar la línea de calibración de 50mm con una regla antes de usar esta hoja para marcar la balsa.
+</div>
+
+<div class="note">
+  Actualizado 2026-08-28: los drivers pasan a la cara <b>inferior</b> de N1 (más cerca de los motores que manejan) —
+  el disipador de cada uno (50×32mm, medido) asoma hacia arriba a través de un recorte, quedando expuesto al aire
+  entre N1 y N2. El MPU6050 va sobre su propio protoboard (34.5×46mm, cinta doble faz) en la cara <b>superior</b>,
+  centrado entre los dos recortes. Resuelve un conflicto de espacio: los tres elementos no entraban compartiendo
+  la misma cara.
+</div>
+
+<div class="layout">
+  <div class="stage" role="img" aria-label="Plantilla a escala real del nivel 1: placa de 76 por 150 milímetros con dos recortes de 50 por 32 milímetros para los disipadores de los drivers montados abajo, el MPU6050 sobre su protoboard de 34.5 por 46 milímetros centrado entre ambos, y los 4 agujeros de varilla con su parche de refuerzo en las esquinas">
+    <div class="patch" style="left:2mm; top:2mm;"></div>
+    <div class="patch" style="left:60mm; top:2mm;"></div>
+    <div class="patch" style="left:2mm; top:134mm;"></div>
+    <div class="patch" style="left:60mm; top:134mm;"></div>
+
+    <div class="hole" style="left:6.35mm; top:6.35mm;"></div>
+    <div class="hole" style="left:64.35mm; top:6.35mm;"></div>
+    <div class="hole" style="left:6.35mm; top:138.35mm;"></div>
+    <div class="hole" style="left:64.35mm; top:138.35mm;"></div>
+
+    <div class="cutout" style="top:16mm;"><span>RECORTAR<br>disipador M1<br>50×32mm</span></div>
+    <div class="mpuzone" style="top:56.75mm;"><span>MPU6050 +<br>protoboard<br>34.5×46mm</span></div>
+    <div class="cutout" style="top:102mm;"><span>RECORTAR<br>disipador M2<br>50×32mm</span></div>
+  </div>
+
+  <div class="side">
+    <div class="calib-label"><b>Calibración de impresión</b></div>
+    <div class="calib"></div>
+    <div class="calib-label">50.0mm exactos — medí con regla</div>
+
+    <div class="legend">
+      <div><b>Línea sólida</b> — contorno de placa (76×150mm).</div>
+      <div><b>Rectángulo rojo rayado</b> — recorte pasante para el disipador (50×32mm, medido). Corta la madera de lado a lado.</div>
+      <div><b>Rectángulo verde punteado</b> — huella del protoboard del MPU6050 (34.5×46mm), solo referencia, no se corta — se pega con cinta doble faz.</div>
+      <div><b>Cuadrado punteado en esquina</b> — parche de refuerzo (~14×14mm), pegar antes de perforar.</div>
+      <div><b>Círculo con cruz</b> — centro del agujero de varilla, Ø5.3mm.</div>
+      <div style="margin-top:2mm;">Margen entre cada recorte y la zona del MPU: <b>~9.75mm</b> a cada lado — es el colchón disponible si hace falta correr el MPU al hacer el dry-fit.</div>
+      <div style="margin-top:2mm; color:var(--danger);">⚠️ <b>Dry-fit antes de recortar madera:</b> el driver BTS7960 mide 50×50mm completo — el recorte de 32mm es solo la porción del disipador. Apoyá el driver real sobre esta hoja, con el disipador alineado al rectángulo rojo, y marcá dónde caen sus 4 tornillos de montaje. Orientá el conector/terminal del driver hacia el borde exterior de N1 (más cerca del motor) para que esos tornillos queden lejos del MPU. Si algún tornillo cae dentro de la zona verde, corré el MPU unos milímetros — hay margen para eso.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Generado 2026-08-27, actualizado 2026-08-28 (drivers abajo con recorte de disipador + MPU sobre protoboard).
+  Plantilla derivada de <code>docs/plano-distribucion-niveles.html</code> y <code>CLAUDE.md</code>
+  (sección "Rediseño del chasis a balsa"), ajustada al largo real de corte (150mm). Antes de perforar: pegar los 4
+  parches de refuerzo y dejar secar. Fuente de verdad ante cualquier discrepancia: <code>CLAUDE.md</code>.
+</footer>
+
+</body>
+</html>

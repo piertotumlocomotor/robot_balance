@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plantilla completa — Nivel 1 + soportes de motor</title>
+<meta name="description" content="Plantilla a escala real 1:1 de la tira completa: soporte motor A + Nivel 1 + soporte motor B, para pegar directo sobre las 3 piezas y garantizar que los dos ejes queden colineales.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f4f5f8;
+    --power:#8a6d00; --power-bg:#fbf6dc;
+    --danger:#b3261e; --danger-bg:#fbeceb;
+    --used:#1f7a3d; --used-bg:#e9f7ee;
+    --bridge:#6b3fa0; --bridge-bg:#f2ecfa;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:8mm; font-size:12px; line-height:1.35;
+  }
+  h1{font-size:1.05rem; margin:0 0 2mm;}
+  .sub{color:var(--dim); font-size:.72rem; margin-bottom:3mm;}
+
+  .warn{
+    background:var(--danger-bg); border:1px solid var(--danger); border-radius:4px;
+    padding:2mm 3mm; font-size:.72rem; color:var(--danger); margin-bottom:3mm; font-weight:600;
+  }
+  .note{
+    background:var(--panel); border:1px solid var(--rule); border-radius:4px;
+    padding:2mm 3mm; font-size:.66rem; color:var(--dim); margin-bottom:3mm;
+  }
+  .rec{
+    background:var(--power-bg); border:1px solid var(--power); border-radius:4px;
+    padding:2mm 3mm; font-size:.66rem; color:var(--power); margin-bottom:3mm;
+  }
+  .rec b{color:var(--ink);}
+
+  /* ---- Zona de escala real: 250 x 76mm físicos exactos ---- */
+  .stage{
+    position:relative; width:280mm; height:76mm;
+    border:0.4mm solid var(--ink); background:#fff; margin-bottom:4mm;
+  }
+  .stage .patch{
+    position:absolute; width:14mm; height:14mm;
+    border:0.35mm dashed var(--power); box-sizing:border-box;
+  }
+  .stage .hole{
+    position:absolute; width:5.3mm; height:5.3mm; border-radius:50%;
+    border:0.35mm solid var(--ink); box-sizing:border-box;
+  }
+  .stage .hole::before, .stage .hole::after{ content:""; position:absolute; background:var(--ink); }
+  .stage .hole::before{ left:2.55mm; top:0mm; width:0.2mm; height:5.3mm; }
+  .stage .hole::after{ left:0mm; top:2.55mm; width:5.3mm; height:0.2mm; }
+
+  .stage .mhole{
+    position:absolute; width:4mm; height:4mm; border-radius:50%;
+    border:0.35mm solid var(--used); box-sizing:border-box;
+  }
+  .stage .mhole::before, .stage .mhole::after{ content:""; position:absolute; background:var(--used); }
+  .stage .mhole::before{ left:1.9mm; top:0mm; width:0.2mm; height:4mm; }
+  .stage .mhole::after{ left:0mm; top:1.9mm; width:4mm; height:0.2mm; }
+
+  .stage .flange{
+    position:absolute; width:40mm; height:40mm; top:18mm;
+    border:0.3mm dashed var(--used); box-sizing:border-box;
+  }
+  .stage .cutout{
+    position:absolute; width:32mm; height:50mm; top:13mm;
+    border:0.4mm solid var(--danger); box-sizing:border-box;
+    background:repeating-linear-gradient(45deg, var(--danger-bg), var(--danger-bg) 3px, #fff 3px, #fff 6px);
+    display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .stage .cutout span{font-family:var(--mono); font-size:5.3px; color:var(--danger); line-height:1.3;}
+  .stage .mpuzone{
+    position:absolute; width:34.5mm; height:46mm; top:15mm;
+    border:0.35mm dashed var(--used); box-sizing:border-box;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .stage .mpuzone span{font-family:var(--mono); font-size:5.3px; color:var(--used); line-height:1.3;}
+  .stage .shaftgap{
+    position:absolute; width:15mm; top:28mm; height:20mm;
+    border:0.3mm dashed var(--danger); box-sizing:border-box;
+    background:var(--danger-bg); opacity:.5;
+  }
+  .stage .joinzone{
+    position:absolute; top:0; width:25mm; height:76mm;
+    background:repeating-linear-gradient(45deg, var(--panel), var(--panel) 3px, #fff 3px, #fff 6px);
+    border-left:0.2mm dotted var(--faint); border-right:0.2mm dotted var(--faint);
+  }
+  .stage .cutline{
+    position:absolute; top:-4mm; width:0; height:84mm;
+    border-left:0.5mm dashed var(--danger);
+  }
+  .stage .cutline .cutlabel{
+    position:absolute; top:-4mm; font-family:var(--mono); font-size:5px; color:var(--danger);
+    white-space:nowrap; transform:translateX(-50%);
+  }
+  .stage label{position:absolute; font-family:var(--mono); color:var(--dim); white-space:nowrap;}
+  .stage .section-title{
+    position:absolute; top:80mm; font-family:var(--mono); font-size:6.5px; font-weight:700;
+    color:var(--ink); text-align:center;
+  }
+  /* ---- fin zona de escala real ---- */
+
+  .below{margin-top:12mm; display:flex; gap:10mm;}
+  .calib{ width:50mm; height:0; border-top:0.4mm solid var(--ink); position:relative; margin:2mm 0 2mm; }
+  .calib::before, .calib::after{ content:""; position:absolute; top:-2mm; width:0.3mm; height:4mm; background:var(--ink); }
+  .calib::before{left:0;} .calib::after{right:0;}
+  .calib-label{font-family:var(--mono); font-size:.66rem; color:var(--ink); margin-bottom:2mm;}
+  .legend{font-size:.66rem; color:var(--dim); display:flex; flex-direction:column; gap:1.3mm; max-width:180mm;}
+  .legend b{color:var(--ink);}
+  footer{color:var(--faint); font-size:.6rem; margin-top:5mm; padding-top:2mm; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:3mm;}
+    .warn, .note, .rec{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .stage *{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    @page{ size:A4 landscape; margin:3mm; }
+  }
+</style>
+</head>
+<body>
+<div style="background:#fbeceb;border:3px solid #b3261e;border-radius:6px;padding:14px 18px;margin:0 0 22px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#181c24;line-height:1.5">
+  <div style="font-size:1.05rem;font-weight:800;color:#b3261e;margin-bottom:6px">&#9940; DOCUMENTO DEPRECADO &mdash; PLANTA VIEJA</div>
+  <p style="margin:6px 0;font-size:.9rem">
+    Describe el robot <b>anterior al rearmado</b>: la arquitectura de <b>soportes de motor separados</b> en N1, superada el 2026-08-28 cuando los drivers pasaron a su propio nivel (N3). Ese robot <b>ya no existe</b>.
+  </p>
+  <p style="margin:6px 0;font-size:.9rem">
+    <b>No usar para cablear, construir ni calcular.</b> Se conserva solo para repasar errores
+    y decisiones de esa etapa.
+  </p>
+  <p style="margin:6px 0 0;font-size:.85rem;color:#4b5563">
+    Documentaci&oacute;n vigente: <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code>
+    (filas del protoboard en <b>&sect;3.1b</b>). Planos vigentes: <code>docs/plano-potencia.html</code>,
+    <code>docs/plano-senales.html</code>, <code>docs/plano-distribucion-niveles.html</code>,
+    <code>docs/plantilla-imprimible-niveles.html</code>.
+  </p>
+</div>
+
+
+<h1>Plantilla completa — Soporte motor A + Nivel 1 + Soporte motor B</h1>
+<div class="sub">Escala real 1:1 · tira continua de 280×76mm (65 + 150 + 65) · garantiza que los dos ejes queden colineales</div>
+
+<div class="warn">
+  IMPRIMIR A ESCALA 100% ("Tamaño real") — NO "Ajustar a la página". Papel A4 apaisado. Verificar la línea de
+  calibración de 50mm con una regla antes de cortar o pegar nada.
+</div>
+
+<div class="note">
+  Ajustado 2026-08-28: los soportes de motor pasaron de 50mm a <b>65mm</b> (tira total 250→280mm). El motor completo
+  mide 51.6mm — con 50mm su cuerpo llegaba casi hasta N1, chocando con las borneras del driver justo del otro lado
+  de la unión. Los 25mm de colchón (antes 10mm) resuelven esto sin tocar N1, que no se modifica — su distribución
+  interna sigue cerrando exacto en 150mm.
+</div>
+
+<div class="note">
+  <b>Cómo usarla:</b> 1) imprimir y verificar escala. 2) Apoyar el motor real sobre cada abertura roja de los
+  extremos y el driver BTS7960 sobre cada recorte rojo del centro, y ajustar tamaño/posición con lápiz antes de
+  cortar madera — orientar el conector del driver hacia afuera, para que sus tornillos no caigan bajo la zona
+  verde del MPU (ahora hay margen de sobra para eso). 3) Cortar el papel por las dos <b>líneas de corte</b>
+  punteadas rojas verticales, separando las 3 secciones. 4) Pegar cada sección sobre su pieza de madera
+  correspondiente (soporte A, N1, soporte B) y perforar a través del papel. 5) Recién ahí unir las 3 piezas.
+</div>
+
+<div class="rec">
+  <b>Recomendación sin cambios:</b> soportes A y B en contrachapado del chasis viejo (no balsa) — están sobre el eje
+  de la rueda, brazo ≈0, no cuesta nada en m·l y da mejor agarre para los tornillos del motor.
+</div>
+
+<div class="stage" role="img" aria-label="Plantilla continua a escala real de 280 por 76 milímetros: soporte de motor A a la izquierda con su brida de 40 por 40 milímetros, zona de despeje de 25mm para el cuerpo del motor y abertura de eje, el nivel 1 en el medio con los recortes de disipador y el MPU6050, y el soporte de motor B a la derecha, simétrico al A, con dos líneas de corte marcando dónde separar el papel">
+
+  <!-- Soporte motor A: L 0-65 -->
+  <div class="shaftgap" style="left:0mm; top:28mm;"></div>
+  <label style="left:1mm; top:37mm; font-size:5px; color:var(--danger);">eje —<br>ajustar</label>
+  <div class="flange" style="left:0mm;"></div>
+  <div class="mhole" style="left:2.8mm; top:23.75mm;"></div>
+  <div class="mhole" style="left:2.8mm; top:48.25mm;"></div>
+  <div class="mhole" style="left:33.2mm; top:23.75mm;"></div>
+  <div class="mhole" style="left:33.2mm; top:48.25mm;"></div>
+  <label style="left:5mm; top:9mm; font-size:5.5px;">SOPORTE MOTOR A</label>
+  <label style="left:5mm; top:13mm; font-size:5px;">brida 40×40 · Ø4mm</label>
+  <div class="joinzone" style="left:40mm;"></div>
+  <label style="left:48mm; top:35mm; font-size:4.6px; writing-mode:vertical-rl;">25mm colchón — pegar a N1</label>
+
+  <div class="cutline" style="left:65mm;"><span class="cutlabel">CORTAR ACÁ</span></div>
+
+  <!-- Nivel 1: L 65-215 (offset +65 respecto de su plano propio) -->
+  <div class="patch" style="left:67mm; top:2mm;"></div>
+  <div class="patch" style="left:67mm; top:60mm;"></div>
+  <div class="patch" style="left:199mm; top:2mm;"></div>
+  <div class="patch" style="left:199mm; top:60mm;"></div>
+  <div class="hole" style="left:71.35mm; top:6.35mm;"></div>
+  <div class="hole" style="left:71.35mm; top:64.35mm;"></div>
+  <div class="hole" style="left:203.35mm; top:6.35mm;"></div>
+  <div class="hole" style="left:203.35mm; top:64.35mm;"></div>
+
+  <div class="cutout" style="left:81mm;"><span>RECORTAR<br>disip. M1<br>50×32</span></div>
+  <div class="mpuzone" style="left:121.75mm;"><span>MPU6050+<br>protoboard<br>34.5×46</span></div>
+  <div class="cutout" style="left:167mm;"><span>RECORTAR<br>disip. M2<br>50×32</span></div>
+  <label style="left:125mm; top:9mm; font-size:5.5px;">NIVEL 1 (150mm, ya cortado)</label>
+  <label style="left:115mm; top:65mm; font-size:4.6px; color:var(--dim);">drivers montados abajo · MPU arriba</label>
+
+  <div class="cutline" style="left:215mm;"><span class="cutlabel">CORTAR ACÁ</span></div>
+
+  <!-- Soporte motor B: L 215-280, mirror de A -->
+  <div class="joinzone" style="left:215mm;"></div>
+  <label style="left:225mm; top:35mm; font-size:4.6px; writing-mode:vertical-rl;">25mm colchón — pegar a N1</label>
+  <div class="flange" style="left:240mm;"></div>
+  <div class="mhole" style="left:242.8mm; top:23.75mm;"></div>
+  <div class="mhole" style="left:242.8mm; top:48.25mm;"></div>
+  <div class="mhole" style="left:273.2mm; top:23.75mm;"></div>
+  <div class="mhole" style="left:273.2mm; top:48.25mm;"></div>
+  <label style="left:244mm; top:9mm; font-size:5.5px;">SOPORTE MOTOR B</label>
+  <label style="left:244mm; top:13mm; font-size:5px;">brida 40×40 · Ø4mm</label>
+  <div class="shaftgap" style="left:265mm; top:28mm;"></div>
+  <label style="left:266mm; top:37mm; font-size:5px; color:var(--danger);">eje —<br>ajustar</label>
+
+  <label style="left:2mm; top:70mm; font-size:5px; color:var(--faint);">centro de eje común (colineal) — W=38mm en toda la tira</label>
+</div>
+
+<div class="below">
+  <div>
+    <div class="calib-label"><b>Calibración de impresión</b></div>
+    <div class="calib"></div>
+    <div class="calib-label">50.0mm exactos — medí con regla</div>
+  </div>
+  <div class="legend">
+    <div><b>Línea sólida negra</b> — contorno de los soportes de motor y de N1.</div>
+    <div><b>Cuadrado verde punteado (extremos)</b> — brida del motor (40×40mm, medida), un lado flush con el borde exterior de cada soporte.</div>
+    <div><b>Círculo verde con cruz (extremos)</b> — centro de agujero de montaje del motor, Ø4mm. Espaciado 24.5×30.4mm centro a centro.</div>
+    <div><b>Rectángulo rojo rayado (centro)</b> — recorte pasante para el disipador de cada BTS7960 (50×32mm, medido) — el driver monta en la cara inferior de N1, el disipador asoma por acá hacia arriba.</div>
+    <div><b>Rectángulo verde punteado (centro)</b> — huella del protoboard del MPU6050 (34.5×46mm), en la cara superior. Solo referencia, se pega con cinta doble faz, no se corta.</div>
+    <div><b>Círculo negro con cruz</b> — agujero de varilla de N1, Ø5.3mm, con su parche de refuerzo punteado.</div>
+    <div><b>Rectángulo rojo (extremos)</b> — abertura del eje, tamaño provisorio. Ajustar contra el motor real antes de cortar madera.</div>
+    <div><b>Línea roja vertical punteada</b> — dónde cortar el papel para separar las 3 secciones antes de pegarlas.</div>
+    <div style="margin-top:1.5mm;">Zona rayada (25mm) — colchón para el cuerpo del motor (51.6mm) y su cableado, más la unión pegada contra N1. Reforzar la unión con un taco cruzado en la cara opuesta a los componentes.</div>
+    <div style="margin-top:1.5mm;">Margen entre cada recorte de disipador y la zona del MPU: <b>~9.75mm</b> a cada lado — colchón disponible si un tornillo del driver cae cerca.</div>
+    <div style="margin-top:1.5mm; color:var(--danger);">⚠️ Nunca tornillo autorroscante en balsa/contrachapado — tuerca-pasante o inserto roscado, tanto para el motor como para el driver.</div>
+    <div style="color:var(--danger);">⚠️ El BTS7960 mide 50×50mm completo — el recorte de 32mm es solo el disipador. Dry-fit real antes de cortar: verificar que los 4 tornillos del driver no caigan bajo la zona verde del MPU.</div>
+  </div>
+</div>
+
+<footer>
+  Generado 2026-08-28. Combina <code>docs/plantilla-imprimible-nivel1.html</code> y
+  <code>docs/plantilla-imprimible-soporte-motor.html</code> en una sola tira para garantizar la colinealidad de los
+  dos ejes. Fuente de verdad ante cualquier discrepancia: <code>CLAUDE.md</code> ("Montaje de los motores en N1").
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plano de potencia — Robot Balanceador</title>
+<meta name="description" content="Conexiones de potencia del robot balanceador con 2x BTS7960: arbol de alimentacion, nodo estrella, riel logico, capacitores y checklist de energizacion.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f6f7f9;
+    --pwr:#b3261e; --pwr-bg:#fbeceb;
+    --logic:#1f5fa8; --logic-bg:#eaf1fb;
+    --gnd:#3f4652; --gnd-bg:#eef0f3;
+    --warn:#8a6d00; --warn-bg:#fbf6dc;
+    --ok:#1f7a3d; --ok-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:24px; font-size:15px; line-height:1.5;
+    max-width:1080px; margin-inline:auto;
+  }
+  h1{font-size:1.5rem; margin:0 0 4px; letter-spacing:-.01em;}
+  h2{font-size:1.05rem; margin:32px 0 10px; padding-bottom:5px; border-bottom:2px solid var(--rule);}
+  h3{font-size:.9rem; margin:20px 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em;}
+  .sub{color:var(--dim); font-size:.85rem; margin-bottom:16px;}
+
+  .banner{
+    background:var(--warn-bg); border:1px solid var(--warn); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; margin-bottom:18px;
+  }
+  .banner b{color:var(--ink);}
+  .stop{
+    background:var(--pwr-bg); border:1px solid var(--pwr); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0; color:var(--pwr);
+  }
+  .stop b{color:var(--ink);}
+  .note{
+    background:var(--panel); border:1px solid var(--rule); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; color:var(--dim); margin:14px 0;
+  }
+  .note b, .stop b{color:var(--ink);}
+  .good{
+    background:var(--ok-bg); border:1px solid var(--ok); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0;
+  }
+
+  .figwrap{overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:#fff; padding:8px;}
+  svg{display:block; min-width:880px;}
+
+  table{border-collapse:collapse; width:100%; font-size:.85rem; margin:10px 0;}
+  th,td{border:1px solid var(--rule); padding:6px 9px; text-align:left; vertical-align:top;}
+  th{background:var(--panel); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--dim);}
+  td code, th code{font-family:var(--mono); font-size:.85em; background:var(--panel); padding:1px 4px; border-radius:3px;}
+  tr.pwr td:first-child{border-left:3px solid var(--pwr);}
+  tr.log td:first-child{border-left:3px solid var(--logic);}
+
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:.78rem; color:var(--dim); margin:10px 0 0;}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .sw{width:22px; height:0; border-top:3px solid;}
+
+  ol.check{padding-left:22px; font-size:.88rem;}
+  ol.check li{margin-bottom:7px;}
+
+  footer{color:var(--faint); font-size:.75rem; margin-top:36px; padding-top:10px; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:10mm; font-size:11px; max-width:none;}
+    .banner,.stop,.note,.good,th,tr.pwr td:first-child,tr.log td:first-child{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    svg{min-width:0; width:100%;}
+    .figwrap{overflow:visible;}
+    h2{page-break-after:avoid;}
+    table{page-break-inside:avoid;}
+    @page{size:A4 portrait; margin:10mm;}
+  }
+</style>
+</head>
+<body>
+
+<h1>Plano de potencia — Robot Balanceador</h1>
+<div class="sub">Solo conexiones de potencia y alimentación. Las señales de control (<code>RPWM</code>/<code>LPWM</code>/<code>EN</code>, I2C, encoders) están en <code>docs/conexiones-registro-pruebas.md</code> <b>§3.1b</b> (filas vigentes del protoboard rearmado).</div>
+
+<div class="banner">
+  <b>Estado al 2026-09-12: potencia armada y energizada parcialmente.</b> Chasis rearmado
+  (2026-09-03), protoboard rehecho (2026-09-12), arquitectura con <b>2× BTS7960 (IBT-2)</b>.
+  <b>Buck nuevo calibrado en 5.01V</b> tras el incidente de polaridad invertida del 2026-09-10
+  (se reemplazaron Buck, C1, capacitor de salida y el fusible de 10A). ⏳ <b>Falta completar V3</b>
+  (confirmar ~12V en <code>B+</code> y ~5V en <code>VCC</code> de cada driver) — quedó interrumpida
+  por ese incidente.
+</div>
+
+<div class="note">
+  <b>Cambio de topología confirmado, 2026-09-03.</b> El nodo estrella <b>ya no es una bornera
+  dedicada</b> como decía la versión anterior de este plano. La topología real tiene <b>dos etapas</b>:
+  batería + <code>B+</code>/<code>B−</code> de M1 y de M2 se unen en una <b>soldadura</b> (empalme
+  mecánico + estaño) — ese es el nodo estrella real — de la que sale <b>un solo cable combinado</b> por
+  lado hacia la <b>bornera de entrada del Buck XL4016</b>. Esa bornera recibe ese cable combinado más la
+  pata de C1: <b>2 conductores, no 4</b> — el conflicto de capacidad de §3 quedó <b>cerrado</b>, resuelto
+  por construcción. Ver detalle en <code>conexiones-registro-pruebas.md</code> §1 y §8.3.
+</div>
+
+<div class="good">
+  ✅ <b>Capacitores completos (2026-09-12).</b> El rearmado se había llevado C1, C4, C4b y C5; solo
+  sobrevivieron C2/C3, soldados a los motores. Hoy están <b>todos</b> instalados: C1, C4, C5, C9,
+  C10/C11, y los dos últimos que faltaban — <b>C6</b> (3V3) y <b>C<sub>en</sub></b> (pin <code>EN</code>)
+  — el 2026-09-12. C1 y el capacitor de salida son unidades nuevas, reemplazadas tras el incidente.
+</div>
+
+<h2>1. Árbol de alimentación</h2>
+
+<div class="figwrap">
+<svg viewBox="0 0 880 700" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Árbol de potencia: batería LiPo 3S pasa por fusible de 10A y switch hasta el nodo estrella. Del nodo estrella salen tres ramas de potencia independientes: al Buck XL4016 y a la entrada B más de cada uno de los dos módulos IBT-2. El Buck alimenta el riel lógico de 5 voltios, que a su vez alimenta el ESP32 y el pin VCC de ambos drivers. Cada driver entrega M más y M menos a su motor.">
+  <defs>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#b3261e"/>
+    </marker>
+    <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#1f5fa8"/>
+    </marker>
+  </defs>
+
+  <g font-family="-apple-system, Segoe UI, sans-serif">
+
+    <!-- ================= cadena de entrada ================= -->
+    <rect x="330" y="16" width="220" height="46" rx="5" fill="#fbeceb" stroke="#b3261e" stroke-width="1.5"/>
+    <text x="440" y="35" text-anchor="middle" font-size="13" font-weight="700" fill="#181c24">LiPo 3S · 2200mAh · 35C</text>
+    <text x="440" y="52" text-anchor="middle" font-size="11" fill="#4b5563">11.1V nom · 12.6V full · XT60</text>
+
+    <line x1="440" y1="62" x2="440" y2="86" stroke="#b3261e" stroke-width="3" marker-end="url(#ap)"/>
+
+    <rect x="355" y="86" width="170" height="34" rx="5" fill="#fff" stroke="#b3261e" stroke-width="1.5"/>
+    <text x="440" y="108" text-anchor="middle" font-size="12" font-weight="600">Fusible 10A</text>
+
+    <line x1="440" y1="120" x2="440" y2="140" stroke="#b3261e" stroke-width="3" marker-end="url(#ap)"/>
+
+    <rect x="355" y="140" width="170" height="34" rx="5" fill="#fff" stroke="#b3261e" stroke-width="1.5"/>
+    <text x="440" y="162" text-anchor="middle" font-size="12" font-weight="600">Switch V+</text>
+
+    <line x1="440" y1="174" x2="440" y2="210" stroke="#b3261e" stroke-width="3" marker-end="url(#ap)"/>
+
+    <!-- ================= soldadura = nodo estrella real ================= -->
+    <circle cx="440" cy="220" r="9" fill="#b3261e"/>
+    <text x="440" y="203" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b3261e">SOLDADURA = NODO ESTRELLA REAL</text>
+    <text x="440" y="245" text-anchor="middle" font-size="10" fill="#4b5563">empalme mecánico + estaño — batería (post-switch) + B+/B− de M1 + B+/B− de M2</text>
+
+    <!-- de la soldadura, tres ramas -->
+    <path d="M440,229 L440,254 L200,254 L200,300" stroke="#b3261e" stroke-width="3" fill="none"/>
+    <path d="M440,229 L440,254 L470,254 L470,300" stroke="#b3261e" stroke-width="3" fill="none" marker-end="url(#ap)"/>
+    <path d="M440,229 L440,254 L730,254 L730,300" stroke="#b3261e" stroke-width="3" fill="none" marker-end="url(#ap)"/>
+    <text x="204" y="277" font-size="9" fill="#b3261e" font-weight="600">cable combinado</text>
+    <text x="477" y="277" font-size="10" fill="#b3261e" font-weight="600">B+ / B−</text>
+    <text x="737" y="277" font-size="10" fill="#b3261e" font-weight="600">B+ / B−</text>
+
+    <!-- C1 entra en la bornera del Buck, no en la soldadura -->
+    <path d="M55,278 L55,320 L108,320" stroke="#8a6d00" stroke-width="2" fill="none" stroke-dasharray="3 2"/>
+    <text x="10" y="266" font-size="9.5" fill="#8a6d00" font-weight="600">C1 100µF/25V</text>
+    <text x="10" y="278" font-size="9.5" fill="#8a6d00">✓ instalado en la</text>
+    <text x="10" y="290" font-size="9.5" fill="#8a6d00">bornera del Buck</text>
+    <text x="200" y="292" text-anchor="middle" font-size="9" fill="#1f7a3d" font-weight="600">✓ 2 conductores — entran</text>
+
+    <!-- ================= Buck ================= -->
+    <rect x="110" y="300" width="180" height="62" rx="5" fill="#fff" stroke="#3f4652" stroke-width="1.5"/>
+    <text x="200" y="320" text-anchor="middle" font-size="12" font-weight="700">Buck XL4016</text>
+    <text x="200" y="336" text-anchor="middle" font-size="10.5" fill="#4b5563">OUT calibrado 5.01V</text>
+    <text x="200" y="352" text-anchor="middle" font-size="10" fill="#8a6d00">no aislado · IN− = OUT−</text>
+
+    <!-- ================= drivers ================= -->
+    <rect x="380" y="300" width="180" height="76" rx="5" fill="#fbeceb" stroke="#b3261e" stroke-width="1.5"/>
+    <text x="470" y="320" text-anchor="middle" font-size="12" font-weight="700">IBT-2 · Motor 1</text>
+    <text x="470" y="336" text-anchor="middle" font-size="10.5" fill="#4b5563">2× BTS7960B = puente H</text>
+    <text x="470" y="351" text-anchor="middle" font-size="10" fill="#1f7a3d">330µF bulk en placa</text>
+    <text x="470" y="367" text-anchor="middle" font-size="10" fill="#4b5563">derecho</text>
+
+    <rect x="640" y="300" width="180" height="76" rx="5" fill="#fbeceb" stroke="#b3261e" stroke-width="1.5"/>
+    <text x="730" y="320" text-anchor="middle" font-size="12" font-weight="700">IBT-2 · Motor 2</text>
+    <text x="730" y="336" text-anchor="middle" font-size="10.5" fill="#4b5563">2× BTS7960B = puente H</text>
+    <text x="730" y="351" text-anchor="middle" font-size="10" fill="#1f7a3d">330µF bulk en placa</text>
+    <text x="730" y="367" text-anchor="middle" font-size="10" fill="#4b5563">izquierdo</text>
+
+    <!-- Buck OUT hacia riel -->
+    <path d="M200,362 L200,444" stroke="#1f5fa8" stroke-width="2.5" fill="none" marker-end="url(#al)"/>
+    <text x="207" y="408" font-size="10" fill="#1f5fa8" font-weight="600">OUT+ 5.01V</text>
+
+    <!-- ================= riel logico ================= -->
+    <line x1="60" y1="450" x2="820" y2="450" stroke="#1f5fa8" stroke-width="4"/>
+    <text x="62" y="442" font-size="11" font-weight="700" fill="#1f5fa8">RIEL 5V + GND LÓGICO</text>
+
+    <!-- riel -> VCC de los drivers (suben) -->
+    <path d="M420,450 L420,380" stroke="#1f5fa8" stroke-width="2" fill="none" stroke-dasharray="5 3" marker-end="url(#al)"/>
+    <path d="M680,450 L680,380" stroke="#1f5fa8" stroke-width="2" fill="none" stroke-dasharray="5 3" marker-end="url(#al)"/>
+    <text x="322" y="412" font-size="10" fill="#1f5fa8" font-weight="600">VCC lógico</text>
+    <text x="582" y="412" font-size="10" fill="#1f5fa8" font-weight="600">VCC lógico</text>
+
+    <!-- riel -> ESP32 -->
+    <path d="M150,450 L150,516" stroke="#1f5fa8" stroke-width="2.5" fill="none" marker-end="url(#al)"/>
+    <rect x="60" y="516" width="180" height="52" rx="5" fill="#fff" stroke="#1f5fa8" stroke-width="1.5"/>
+    <text x="150" y="536" text-anchor="middle" font-size="12" font-weight="700">ESP32 NodeMCU</text>
+    <text x="150" y="552" text-anchor="middle" font-size="10.5" fill="#4b5563">pin 5V (VIN) + GND</text>
+    <text x="150" y="564" text-anchor="middle" font-size="9.5" fill="#8a6d00">3V3 → MPU + encoders</text>
+
+    <!-- drivers -> motores (con salto sobre el riel logico) -->
+    <path d="M520,376 L520,443 A 7,7 0 0 1 520,457 L520,556"
+          stroke="#b3261e" stroke-width="3" fill="none" marker-end="url(#ap)"/>
+    <path d="M780,376 L780,443 A 7,7 0 0 1 780,457 L780,556"
+          stroke="#b3261e" stroke-width="3" fill="none" marker-end="url(#ap)"/>
+    <text x="527" y="505" font-size="10" fill="#b3261e" font-weight="600">M+ / M−</text>
+    <text x="787" y="505" font-size="10" fill="#b3261e" font-weight="600">M+ / M−</text>
+
+    <rect x="420" y="556" width="200" height="54" rx="5" fill="#fff" stroke="#b3261e" stroke-width="1.5"/>
+    <text x="520" y="576" text-anchor="middle" font-size="12" font-weight="700">Motor 1 (derecho)</text>
+    <text x="520" y="592" text-anchor="middle" font-size="10.5" fill="#4b5563">JGB37-520B · 6V · 793 RPM</text>
+    <text x="520" y="604" text-anchor="middle" font-size="9.5" fill="#4b5563">C2 100nF en pestañas</text>
+
+    <rect x="680" y="556" width="200" height="54" rx="5" fill="#fff" stroke="#b3261e" stroke-width="1.5"/>
+    <text x="780" y="576" text-anchor="middle" font-size="12" font-weight="700">Motor 2 (izquierdo)</text>
+    <text x="780" y="592" text-anchor="middle" font-size="10.5" fill="#4b5563">JGB37-520B · 6V · 793 RPM</text>
+    <text x="780" y="604" text-anchor="middle" font-size="9.5" fill="#4b5563">C3 100nF en pestañas</text>
+
+    <!-- nota espejo -->
+    <text x="440" y="640" text-anchor="middle" font-size="10.5" fill="#8a6d00" font-weight="600">
+      M1 y M2 montados en espejo → dan signo opuesto de encoder para el mismo comando
+    </text>
+    <text x="440" y="658" text-anchor="middle" font-size="10.5" fill="#8a6d00">
+      El sentido de giro se valida por encoder (Test 3, Fase 1) antes de subir el duty — no se asume
+    </text>
+    <text x="440" y="682" text-anchor="middle" font-size="10" fill="#8a93a3">
+      El arco en las líneas M+/M− indica cruce sin conexión con el riel lógico
+    </text>
+  </g>
+</svg>
+</div>
+
+<div class="legend">
+  <span><i class="sw" style="border-color:#b3261e"></i> Potencia (batería / motores)</span>
+  <span><i class="sw" style="border-color:#1f5fa8"></i> Lógica (5V desde el Buck)</span>
+  <span><i class="sw" style="border-color:#1f5fa8; border-top-style:dashed"></i> Alimentación lógica del driver</span>
+</div>
+
+<h2>2. Tabla de conexiones de potencia</h2>
+
+<table>
+  <thead>
+    <tr><th style="width:24%">Origen</th><th style="width:26%">Destino</th><th>Nota</th></tr>
+  </thead>
+  <tbody>
+    <tr class="pwr"><td>Batería V+ (XT60)</td><td>Fusible 10A → Switch</td><td>En línea, antes de la soldadura</td></tr>
+    <tr class="pwr"><td>Switch (salida)</td><td><b>Soldadura +</b> <span style="color:#b3261e">(nodo estrella real)</span></td><td>Empalme mecánico + estaño — no una bornera</td></tr>
+    <tr class="pwr"><td>Batería GND</td><td><b>Soldadura −</b> <span style="color:#b3261e">(nodo estrella real)</span></td><td>Ídem</td></tr>
+    <tr class="pwr"><td>Soldadura +</td><td>IBT-2 M1 <code>B+</code></td><td>Rama directa desde la soldadura</td></tr>
+    <tr class="pwr"><td>Soldadura +</td><td>IBT-2 M2 <code>B+</code></td><td>Ídem</td></tr>
+    <tr class="pwr"><td>Soldadura +</td><td>Buck <code>IN+</code></td><td>Vía <b>un cable combinado</b>, no directo — es el único conductor de la soldadura que llega a la bornera</td></tr>
+    <tr class="pwr"><td>Buck <code>IN+</code></td><td>C1 <code>+</code></td><td>✅ Instalado — 100µF/25V, como segundo conductor junto al cable combinado (ver §5)</td></tr>
+    <tr class="pwr"><td>Soldadura −</td><td>IBT-2 M1 <code>B−</code></td><td>✅ Cableado. Tras V1 (2026-09-10) este es el <b>único</b> camino de masa del driver — <code>B−</code> y el <code>GND</code> del header son la misma pista</td></tr>
+    <tr class="pwr"><td>Soldadura −</td><td>IBT-2 M2 <code>B−</code></td><td>⚠️ ídem</td></tr>
+    <tr class="pwr"><td>Soldadura −</td><td>Buck <code>IN−</code></td><td>Vía el cable combinado del lado GND</td></tr>
+    <tr class="pwr"><td>Buck <code>IN−</code></td><td>C1 <code>−</code></td><td>✅ Instalado</td></tr>
+    <tr class="log"><td>Buck <code>OUT+</code></td><td>Riel 5V lógico</td><td>Calibrado <b>5.01V</b> (unidad nueva, 2026-09-12). El 4.98V era la unidad destruida por polaridad invertida</td></tr>
+    <tr class="log"><td>Buck <code>OUT−</code></td><td>Riel GND lógico</td><td>Común interno con <code>IN−</code> (Buck no aislado)</td></tr>
+    <tr class="log"><td>Riel 5V lógico</td><td>ESP32 pin <code>5V</code> (VIN)</td><td>Alimentación del micro</td></tr>
+    <tr class="log"><td>Riel GND lógico</td><td>ESP32 pin <code>GND</code></td><td>⚠️ Sin esto los motores no responden aunque el Serial USB funcione — bug ya sufrido</td></tr>
+    <tr class="log"><td>Riel 5V lógico</td><td>IBT-2 M1 <code>VCC</code></td><td>⚠️ Sin esto la lógica del driver no conmuta nada</td></tr>
+    <tr class="log"><td>Riel 5V lógico</td><td>IBT-2 M2 <code>VCC</code></td><td>⚠️ Ídem</td></tr>
+    <tr class="log" style="opacity:.6"><td><s>Riel GND lógico</s></td><td><s>IBT-2 <code>GND</code> header (×2)</s></td><td>⛔ <b>NO cablear — resuelto 2026-09-10 (V1): <code>B−</code> y <code>GND</code> del header son la misma pista</b> (dan continuidad en los dos módulos). Llevar ambos arma lazo de masa; la referencia común ya la da <code>B−</code> → soldadura. Se cableó por error el 2026-09-12 y se retiró — ver <code>conexiones-registro-pruebas.md</code> 7.26</td></tr>
+    <tr class="pwr"><td>IBT-2 M1 <code>M+</code> / <code>M−</code></td><td>Motor 1 (rojo / blanco)</td><td>Motor derecho</td></tr>
+    <tr class="pwr"><td>IBT-2 M2 <code>M+</code> / <code>M−</code></td><td>Motor 2 (rojo / blanco)</td><td>Motor izquierdo</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>Regla de estrella, ajustada a la topología real:</b> el nodo estrella es la <b>soldadura</b>, no
+  la bornera del Buck — el Buck recibe su alimentación de potencia por un cable propio desde ahí, igual
+  que cada driver. Lo que sigue valiendo: ningún cable hace de "paso" entre dos cargas (nada de
+  <code>B+</code> de un driver puenteado al otro), y el GND de potencia y el GND lógico se unen
+  <b>únicamente</b> en la soldadura. La salvedad de siempre: el pin <code>VCC</code> de cada driver sale
+  del Buck (lógica interna del chip, consumo de pocos mA).
+</div>
+
+<h2>3. ✅ Capacidad de la bornera del Buck — cerrado, resuelto por empalme</h2>
+
+<div class="good">
+  El cálculo original asumía una bornera dedicada de varias posiciones y calculaba 4 conductores
+  necesarios en la bornera del Buck (batería + <code>B+</code> M1 + <code>B+</code> M2 + Buck). La
+  topología real es distinta: batería + los dos <code>B+</code> se unen en una <b>soldadura</b> aparte
+  (el nodo estrella real, ver §1), y de ahí sale <b>un solo cable combinado</b> hacia la bornera del
+  Buck. Esa bornera solo tiene que alojar <b>2 conductores</b> — el cable combinado y C1 — no 4, y
+  entró sin problema (instalado 2026-09-03).
+</div>
+
+<table>
+  <thead><tr><th>Situación</th><th>Conductores en la bornera del Buck (lado +)</th><th>Total</th><th>¿Entra?</th></tr></thead>
+  <tbody>
+    <tr><td>L298N, bornera dedicada (antes)</td><td>Buck <code>IN+</code>, L298N <code>VIN+</code></td><td>2 + la entrada de batería</td><td>✅ justo, en 3 posiciones</td></tr>
+    <tr><td>2× IBT-2, bornera dedicada (plan original, nunca construido)</td><td>Buck <code>IN+</code>, <code>B+</code> M1, <code>B+</code> M2</td><td>4</td><td>⛔ no entraba</td></tr>
+    <tr><td><b>2× IBT-2, real — soldadura + bornera del Buck (2026-09-03)</b></td><td>cable combinado (batería + <code>B+</code> M1 + <code>B+</code> M2) + C1</td><td><b>2</b></td><td>✅ <b>entró</b></td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:.88rem;">Lo mismo del lado GND. Así quedó resuelto, de las opciones que se habían
+evaluado:</p>
+<ol style="font-size:.88rem;">
+  <li><b>Bornera de más posiciones</b>, en línea antes del Buck. Era la recomendada, pero no la que se usó.</li>
+  <li>✅ <b>Empalme / pigtail — la que se usó.</b> Batería + los dos <code>B+</code> (y del lado GND, los dos <code>B−</code>) soldados en un nodo de unión aparte, con un solo cable combinado hacia la bornera del Buck. El punto de estrella real quedó documentado como esa soldadura, no el tornillo del Buck — ver §1.</li>
+  <li>⛔ <b>Puentear <code>B+</code> de un driver al otro en cadena.</b> Viola la regla del proyecto: el consumo de un motor pasaría por el terminal del otro. Es exactamente lo que la estrella existe para evitar, y con los dos motores conduciendo a la vez — el caso que ya dio problemas medidos — es el peor momento para introducirlo.</li>
+</ol>
+
+<h2>4. ⚠️ A medir antes de cablear: <code>B−</code> vs <code>GND</code> del header</h2>
+
+<div class="note">
+  Datasheet oficial Infineon, §6.2, textual: <i>"The BTS7960 has no separate pin for power ground
+  and logic ground."</i> <b>El chip tiene un solo GND.</b> Es muy probable que en el módulo IBT-2 el
+  pin <code>GND</code> del header de señal y el terminal <code>B−</code> de potencia sean la misma pista.
+</div>
+
+<p style="font-size:.88rem;">Si lo son, cablear los dos (uno al riel lógico, otro al nodo estrella)
+crea un <b>lazo de masa</b> en paralelo — justo lo que la topología estrella existe para evitar.</p>
+
+<p style="font-size:.88rem;"><b>Medición:</b> con el módulo desconectado, continuidad entre el pin
+<code>GND</code> del header y el terminal <code>B−</code>.</p>
+
+<table>
+  <thead><tr><th style="width:30%">Resultado</th><th>Qué cablear</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Dan continuidad</b><br><span style="color:#4b5563">(esperado)</span></td>
+      <td>Cablear <b>solo <code>B−</code></b> al nodo estrella de potencia. <b>No</b> llevar el <code>GND</code> del header al riel lógico — la referencia común ya queda establecida por la estrella. Verificar igual continuidad ESP32 ↔ driver antes de energizar.</td>
+    </tr>
+    <tr>
+      <td><b>Están separados</b></td>
+      <td>Cablear ambos, tal como dice la tabla de §2.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="stop"><b>No asumir el resultado.</b> Es una medición de 30 segundos y decide la topología de masa de todo el robot.</div>
+
+<h2>5. Capacitores del camino de potencia — reconstruidos tras el rearmado</h2>
+
+<div class="good">
+  ✅ <b>Bulk reconstruido: C1, C4 y C5 ya instalados (2026-09-03).</b> El rearmado del chasis se había
+  llevado puestos C1, C4, C4b y C5; solo sobrevivieron C2/C3, soldados a las pestañas de cada motor.
+  Stock usado para reconstruir: electrolíticos <b>1000µF/16V</b>, <b>1000µF/50V</b> y <b>100µF/25V</b>.
+  Detalle completo del razonamiento en <code>plano-conexiones-esp32.html</code> §4, que también lista
+  los cerámicos (104 = 100nF) todavía recomendados y sin instalar.
+</div>
+
+<table>
+  <thead><tr><th style="width:10%">ID</th><th style="width:18%">Valor usado</th><th style="width:28%">Ubicación</th><th>Estado / propósito</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>C1</b></td><td>100µF, <b>25V</b></td>
+      <td>Bornera <code>IN</code> del Buck, junto al cable combinado que viene de la soldadura (ver §1, §3)</td>
+      <td>✅ <b>Instalado (2026-09-03).</b> El 25V calza con el objetivo que ya tenía este proyecto para C1. Menos capacidad que el 1000µF original, pero cada IBT-2 ya trae 330µF de fábrica en su <code>B+</code>/<code>B−</code> — el reservorio que importa en la conmutación está ahí, C1 es secundario. La bornera tuvo lugar físico para esta pata.</td>
+    </tr>
+    <tr>
+      <td><b>C<sub>bus</sub></b></td><td>330µF ×2</td>
+      <td><code>B+</code>/<code>B−</code> de cada IBT-2</td>
+      <td>✅ <b>Vienen de fábrica</b>, uno por módulo — no depende del rearmado del chasis, verificar igual que sigan soldados. No hace falta bulk externo por driver para arrancar.</td>
+    </tr>
+    <tr>
+      <td><b>C2 / C3</b></td><td>100nF cerámico</td>
+      <td>Pestañas de cada motor</td>
+      <td>✅ Sobrevivieron el rearmado. Supresión de ruido de escobillas, sin cambios.</td>
+    </tr>
+    <tr>
+      <td><b>C4</b></td><td>1000µF, <b>16V</b></td>
+      <td>Protoboard ESP32, fila 30-A (junto al cable de <code>VIN</code> en 30-B)</td>
+      <td>✅ <b>Instalado (2026-09-03).</b> Este nodo es de ~5V — se reservó el 50V para donde el margen realmente hace falta. Junto con C5, define si hay algo de bulk en el riel del ESP32. ⏳ Pendiente verificar con multímetro continuidad 30-A↔30-C.</td>
+    </tr>
+    <tr>
+      <td><b>C5</b></td><td>1000µF, <b>50V</b></td>
+      <td>Salida 5V del Buck, antes de repartir</td>
+      <td>✅ <b>Reinstalado (2026-09-03).</b> Protege con un solo capacitor la rama del ESP32 y la de los drivers. Más tensión de la que este nodo necesita, no hace daño.</td>
+    </tr>
+    <tr>
+      <td><b>C6</b></td><td>104 (100nF cerámico)</td>
+      <td>Riel 3V3 compartido</td>
+      <td>✅ <b>Instalado 2026-09-12</b> — fila 12 del protoboard rearmado → riel "−". Ver registro 3.1b / 7.25.</td>
+    </tr>
+    <tr>
+      <td><b>C9</b> <span style="color:#8a93a3">(nuevo)</span></td><td>104 (100nF cerámico)</td>
+      <td>Fila 30-A, soldado junto con C4</td>
+      <td>✅ Instalado (2026-09-06).</td>
+    </tr>
+    <tr>
+      <td><b>C10 / C11</b> <span style="color:#8a93a3">(nuevos)</span></td><td>104 (100nF cerámico) ×2</td>
+      <td>Soldados en el header de cada IBT-2, entre <code>VCC</code> y <code>GND</code></td>
+      <td>✅ Instalados (2026-09-06), uno por driver.</td>
+    </tr>
+    <tr>
+      <td><b>C<sub>en</sub></b> <span style="color:#8a93a3">(nuevo)</span></td><td>104 (100nF cerámico)</td>
+      <td>Pin <code>EN</code> ↔ <code>GND</code></td>
+      <td>✅ <b>Instalado 2026-09-12</b> — fila 13 (pin <code>EN</code> del ESP32) → riel "−". Ver registro 3.1b / 7.25.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note">
+  El datasheet (§6.2) recomienda además un <b>cerámico de ~470nF de VS a GND pegado a cada chip</b>,
+  para la corriente de la fase de conmutación por un camino de baja inductancia. Los módulos IBT-2
+  traen cerámicos SMD en placa — verificar si ya lo cubren antes de agregar nada.
+</div>
+
+<h2>6. Alimentación durante el debug</h2>
+
+<div class="good">
+  ✅ <b>Batería + USB simultáneos.</b> La batería alimenta vía Buck (5.01V) y el USB queda solo como
+  cable de datos para el Serial. Es la configuración correcta.
+</div>
+
+<div class="stop">
+  ⛔ <b>USB solo, sin batería.</b> El riel se derrumba (VIN 2.2V, 3V3 ≈1V) porque el USB intenta
+  energizar <b>hacia atrás</b> la salida apagada del Buck. Si hace falta, desconectar antes el jumper
+  del riel de 5V del Buck al VIN del ESP32.
+</div>
+
+<div class="note">
+  Los ~360Ω que se miden entre 5V y GND <b>no son un corto</b>: son el camino pasivo del Buck
+  back-driven. Un corto real da pocos ohms.
+</div>
+
+<h2>7. Checklist antes de la primera energización</h2>
+
+<div class="stop">
+  <b>Tres veces</b> en este proyecto el mismo síntoma —"el firmware reporta todo bien y ningún motor
+  se mueve"— costó horas: pin lógico sin alimentar, sin GND común, y switch en OFF. Las tres
+  agravadas por lo mismo: <b>el USB alimenta el micro y da la falsa sensación de que el sistema está
+  energizado.</b> El Serial funcionando no dice nada sobre la etapa de potencia.
+</div>
+
+<ol class="check">
+  <li><b>Switch de V+ en ON.</b></li>
+  <li><b><code>B+</code> de cada módulo mide ~12V</b> contra GND de potencia. ⚠️ <b>Son dos entradas ahora, no una</b> — medir las dos. Cubre switch, fusible, batería y nodo estrella de una sola medición.</li>
+  <li><b><code>VCC</code> de cada módulo mide ~5V.</b> También son dos.</li>
+  <li><b>Continuidad entre un <code>GND</code> del ESP32 y el GND del driver</b>, resuelto según §4.</li>
+  <li><b>Las 2 pull-downs de 10kΩ en las líneas <code>EN</code> instaladas.</b> Con el BTS7960 el pin que corta el puente es <code>EN</code>, no <code>RPWM</code>/<code>LPWM</code> — las 4 pull-downs viejas quedaron en los pines equivocados para este driver.</li>
+  <li><b>Sentido de giro validado por encoder</b> (Test 3, Fase 1) antes de subir el duty.</li>
+</ol>
+
+<div class="note">
+  Si los seis pasan y los motores igual no giran, recién ahí el problema es de firmware, del driver
+  o del motor.
+</div>
+
+<div class="banner">
+  <b>Cap de PWM:</b> el tope de 160 <b>no se hereda</b> del L298N — se calibró contra BJTs que se
+  comían varios volts. Con MOSFET (R<sub>ON</sub> 7–10 mΩ) esa caída desaparece y el mismo duty
+  entrega bastante más tensión real al motor. Punto de partida: <b>121</b>
+  (6.0V nominal del motor / 12.6V batería llena × 255).
+</div>
+
+<footer>
+  Generado 2026-08-29, actualizado 2026-09-03 (rearmado del chasis: topología del nodo estrella y
+  capacitores). Fuente de verdad ante cualquier discrepancia: <code>CLAUDE.md</code> y
+  <code>docs/conexiones-registro-pruebas.md</code> (§1, §2, §6 y §8).
+  Umbrales y citas del datasheet: <code>docs/BTS7960.pdf</code> (Infineon, Rev 1.1).
+  Complementa a <a href="plano-conexiones-esp32.html"><code>plano-conexiones-esp32.html</code></a>
+  (detalle de capacitores y su ubicación en el protoboard). Reemplaza la parte de potencia de
+  <code>obsoleto/plano-electrico.html</code>, que describe la arquitectura con L298N.
+</footer>
+
+</body>
+</html>

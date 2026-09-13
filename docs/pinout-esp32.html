@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinout — NodeMCU ESP-32S</title>
+<meta name="description" content="Referencia de pines de la placa NodeMCU ESP-32S usada en el robot balanceador, con las asignaciones del proyecto.">
+<style>
+  :root{
+    --bg:#12151c; --bg-panel:#191e28; --bg-inset:#0d0f15;
+    --ink:#e9e6df; --ink-dim:#9aa0ad; --ink-faint:#6b7180;
+    --rule:#2a3040;
+    --used:#4fae63; --used-ink:#0d2013;
+    --bootstrap:#d98e3a; --bootstrap-ink:#3a2508;
+    --danger:#d1554a; --danger-ink:#3a1310;
+    --inputonly:#5b9fd9; --inputonly-ink:#0e2436;
+    --free:#3a4256;
+    --power:#e0c34a;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:1rem; max-width:900px; margin-inline:auto; line-height:1.5;
+  }
+  h1{font-size:1.3rem; margin:.2rem 0 0;}
+  .sub{color:var(--ink-dim); font-size:.85rem; margin-bottom:1rem;}
+  .note{
+    background:var(--bg-panel); border:1px solid var(--rule); border-left:3px solid var(--bootstrap);
+    border-radius:6px; padding:.8rem 1rem; font-size:.85rem; color:var(--ink-dim); margin-bottom:1.2rem;
+  }
+  .note b{color:var(--ink);}
+
+  .legend{display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1.2rem;}
+  .chip{
+    font-family:var(--mono); font-size:.72rem; padding:.25rem .6rem; border-radius:20px;
+    display:flex; align-items:center; gap:.4rem;
+  }
+  .chip .dot{width:9px; height:9px; border-radius:50%;}
+  .chip.used{background:rgba(79,174,99,.12); color:var(--used); border:1px solid rgba(79,174,99,.4);}
+  .chip.used .dot{background:var(--used);}
+  .chip.bootstrap{background:rgba(217,142,58,.12); color:var(--bootstrap); border:1px solid rgba(217,142,58,.4);}
+  .chip.bootstrap .dot{background:var(--bootstrap);}
+  .chip.danger{background:rgba(209,85,74,.12); color:var(--danger); border:1px solid rgba(209,85,74,.4);}
+  .chip.danger .dot{background:var(--danger);}
+  .chip.inputonly{background:rgba(91,159,217,.12); color:var(--inputonly); border:1px solid rgba(91,159,217,.4);}
+  .chip.inputonly .dot{background:var(--inputonly);}
+  .chip.free{background:rgba(255,255,255,.04); color:var(--ink-dim); border:1px solid var(--rule);}
+  .chip.free .dot{background:var(--free);}
+  .chip.power{background:rgba(224,195,74,.12); color:var(--power); border:1px solid rgba(224,195,74,.4);}
+  .chip.power .dot{background:var(--power);}
+
+  .board-wrap{overflow-x:auto; padding-bottom:.5rem;}
+  .board{
+    display:grid; grid-template-columns: 1fr 120px 1fr; gap:0 .8rem;
+    min-width:640px; align-items:stretch; margin-bottom:1.6rem;
+  }
+  .col{display:flex; flex-direction:column; gap:3px;}
+  .col.right .row{flex-direction:row-reverse; text-align:right;}
+  .center{
+    background:var(--bg-inset); border:1px solid var(--rule); border-radius:8px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:1rem .5rem; gap:.3rem; position:relative;
+  }
+  .center .esp{
+    background:linear-gradient(160deg,#2a3040,#191e28); border:1px solid var(--rule);
+    border-radius:4px; padding:.6rem .4rem; font-family:var(--mono); font-size:.68rem;
+    color:var(--ink-dim); text-align:center; writing-mode:vertical-rl; text-orientation:mixed;
+    height:70%;
+  }
+  .center .usb{
+    font-family:var(--mono); font-size:.6rem; color:var(--ink-faint); text-align:center;
+  }
+
+  .row{
+    display:flex; align-items:center; gap:.5rem; padding:.32rem .5rem;
+    border-radius:5px; border:1px solid var(--rule); background:var(--bg-panel);
+    font-size:.78rem; min-height:2.3rem;
+  }
+  .row .label{font-family:var(--mono); font-weight:700; min-width:2.6rem;}
+  .row .gpio{font-family:var(--mono); color:var(--ink-faint); font-size:.7rem;}
+  .row .fn{color:var(--ink-dim); font-size:.72rem; flex:1;}
+  .col.right .row .fn{text-align:right;}
+
+  .row.used{border-color:rgba(79,174,99,.5); background:rgba(79,174,99,.07);}
+  .row.used .label{color:var(--used);}
+  .row.bootstrap{border-color:rgba(217,142,58,.45); background:rgba(217,142,58,.06);}
+  .row.bootstrap .label{color:var(--bootstrap);}
+  .row.danger{border-color:rgba(209,85,74,.45); background:rgba(209,85,74,.06);}
+  .row.danger .label{color:var(--danger);}
+  .row.inputonly{border-color:rgba(91,159,217,.4); background:rgba(91,159,217,.06);}
+  .row.inputonly .label{color:var(--inputonly);}
+  .row.power{border-color:rgba(224,195,74,.4); background:rgba(224,195,74,.06);}
+  .row.power .label{color:var(--power);}
+  .row.free .label{color:var(--ink-faint);}
+
+  .side-lbl{
+    font-family:var(--mono); font-size:.65rem; color:var(--ink-faint); text-transform:uppercase;
+    letter-spacing:.08em; text-align:center; margin-bottom:.3rem;
+  }
+
+  table{width:100%; border-collapse:collapse; font-size:.85rem; margin-top:.5rem;}
+  caption{text-align:left; font-family:var(--mono); font-size:.7rem; color:var(--ink-faint); margin-bottom:.5rem; text-transform:uppercase; letter-spacing:.06em;}
+  th{text-align:left; font-family:var(--mono); font-size:.68rem; text-transform:uppercase; color:var(--ink-dim); border-bottom:1px solid var(--rule); padding:.4rem .5rem;}
+  td{padding:.4rem .5rem; border-bottom:1px solid var(--rule); }
+  tr:last-child td{border-bottom:none;}
+  .table-wrap{overflow-x:auto;}
+
+  footer{color:var(--ink-faint); font-size:.75rem; margin-top:2rem; padding-top:1rem; border-top:1px solid var(--rule);}
+</style>
+</head>
+<body>
+
+<h1>Pinout — NodeMCU ESP-32S (38 pines)</h1>
+<div class="sub">Reconstruido a partir de la foto de la placa · orientación: USB hacia abajo, tal como se ve al leer la serigrafía</div>
+
+<div class="note">
+  Reconstruido leyendo una foto de tu placa el 2026-08-04 (corregido dos veces:
+  primero el orden de la columna izquierda, después el lado — izquierda y derecha
+  estaban invertidas respecto a lo que describiste, con USB-C cerca tuyo y
+  serigrafía hacia vos). Si algo acá no coincide con lo que ves físicamente
+  impreso en la placa, <b>priorizá lo que ves</b> y avisame para corregir este
+  archivo — no lo tomes como más confiable que la placa real.
+  <br><br>
+  ✅ <b>Reconfirmado 2026-09-03</b> contra una foto nueva y nítida de la placa real, tomada
+  durante el cableado post-rearmado — no la del 2026-08-04. Los dos lados coinciden
+  columna por columna con lo de abajo, incluida la zona que había dado problemas antes
+  (P25/P26/P27/P14/P12 a la izquierda, P19/P18/P5 a la derecha). Único ajuste: el orden de
+  <code>TX</code>/<code>RX</code> estaba invertido — corregido más abajo.
+  <br><br>
+  <b>Esta página siempre asume USB-C hacia abajo</b>, sin importar cómo quedó
+  insertada la placa en tu protoboard. Si tu protoboard la tiene rotada o de
+  costado, buscá primero el conector USB-C físicamente y orientate desde ahí —
+  no calques "izquierda/derecha" de cómo la ves sentado en tu mesa.
+</div>
+
+<div class="legend">
+  <span class="chip used"><span class="dot"></span>Usado en el proyecto</span>
+  <span class="chip bootstrap"><span class="dot"></span>Bootstrapping — cuidado</span>
+  <span class="chip danger"><span class="dot"></span>Flash interna — nunca tocar</span>
+  <span class="chip inputonly"><span class="dot"></span>Solo entrada</span>
+  <span class="chip power"><span class="dot"></span>Alimentación</span>
+  <span class="chip free"><span class="dot"></span>Libre</span>
+</div>
+
+<div class="board-wrap">
+  <div class="board">
+    <div class="col left">
+      <div class="side-lbl">Lado izquierdo</div>
+
+      <div class="row power"><span class="label">3V3</span><span class="gpio"></span><span class="fn">3.3V → VCC GY-521</span></div>
+      <div class="row free"><span class="label">EN</span><span class="gpio"></span><span class="fn">reset (no usar como GPIO)</span></div>
+      <div class="row inputonly"><span class="label">SVP</span><span class="gpio">GPIO36</span><span class="fn">solo entrada</span></div>
+      <div class="row inputonly"><span class="label">SVN</span><span class="gpio">GPIO39</span><span class="fn">solo entrada</span></div>
+      <div class="row inputonly"><span class="label">P34</span><span class="gpio">GPIO34</span><span class="fn">solo entrada</span></div>
+      <div class="row inputonly"><span class="label">P35</span><span class="gpio">GPIO35</span><span class="fn">solo entrada</span></div>
+      <div class="row used"><span class="label">P32</span><span class="gpio">GPIO32</span><span class="fn">Encoder M1 · canal A</span></div>
+      <div class="row used"><span class="label">P33</span><span class="gpio">GPIO33</span><span class="fn">Encoder M1 · canal B</span></div>
+      <div class="row used"><span class="label">P25</span><span class="gpio">GPIO25</span><span class="fn">Encoder M2 · canal A</span></div>
+      <div class="row used"><span class="label">P26</span><span class="gpio">GPIO26</span><span class="fn">Encoder M2 · canal B</span></div>
+      <div class="row used"><span class="label">P27</span><span class="gpio">GPIO27</span><span class="fn">ENA · PWM Motor 1</span></div>
+      <div class="row used"><span class="label">P14</span><span class="gpio">GPIO14</span><span class="fn">IN1 · dirección M1</span></div>
+      <div class="row used"><span class="label">P12</span><span class="gpio">GPIO12</span><span class="fn" style="color:var(--bootstrap)">⚠ bootstrap — no usado, evitar igual</span></div>
+      <div class="row power"><span class="label">GND</span><span class="gpio"></span><span class="fn">tierra</span></div>
+      <div class="row used"><span class="label">P13</span><span class="gpio">GPIO13</span><span class="fn">IN2 · dirección M1</span></div>
+      <div class="row danger"><span class="label">SD2</span><span class="gpio">SPI flash</span><span class="fn">nunca conectar</span></div>
+      <div class="row danger"><span class="label">SD3</span><span class="gpio">SPI flash</span><span class="fn">nunca conectar</span></div>
+      <div class="row power"><span class="label">GND</span><span class="gpio"></span><span class="fn">tierra</span></div>
+      <div class="row power"><span class="label">5V</span><span class="gpio"></span><span class="fn">alimentación desde el Buck</span></div>
+    </div>
+
+    <div class="center">
+      <div class="esp">NODEMCU ESP-32S</div>
+      <div class="usb" style="color:var(--power); font-weight:700; font-size:.68rem; letter-spacing:.04em;">▼<br>USB-C<br>▼</div>
+    </div>
+
+    <div class="col right">
+      <div class="side-lbl">Lado derecho</div>
+
+      <div class="row power"><span class="label">GND</span><span class="gpio"></span><span class="fn">tierra</span></div>
+      <div class="row free"><span class="label">P23</span><span class="gpio">GPIO23</span><span class="fn">libre</span></div>
+      <div class="row used"><span class="label">P22</span><span class="gpio">GPIO22</span><span class="fn">SCL → GY-521</span></div>
+      <div class="row free"><span class="label">RX</span><span class="gpio">GPIO3</span><span class="fn">USB serie</span></div>
+      <div class="row free"><span class="label">TX</span><span class="gpio">GPIO1</span><span class="fn">USB serie</span></div>
+      <div class="row used"><span class="label">P21</span><span class="gpio">GPIO21</span><span class="fn">SDA → GY-521</span></div>
+      <div class="row power"><span class="label">GND</span><span class="gpio"></span><span class="fn">tierra</span></div>
+      <div class="row free"><span class="label">P19</span><span class="gpio">GPIO19</span><span class="fn">libre</span></div>
+      <div class="row free"><span class="label">P18</span><span class="gpio">GPIO18</span><span class="fn">libre</span></div>
+      <div class="row bootstrap"><span class="label">P5</span><span class="gpio">GPIO5</span><span class="fn">emite pulso al bootear — evitar en motores</span></div>
+      <div class="row used"><span class="label">P16</span><span class="gpio">GPIO16</span><span class="fn">IN3 · dirección M2</span></div>
+      <div class="row used"><span class="label">P17</span><span class="gpio">GPIO17</span><span class="fn">IN4 · dirección M2</span></div>
+      <div class="row used"><span class="label">P4</span><span class="gpio">GPIO4</span><span class="fn">ENB · PWM Motor 2</span></div>
+      <div class="row bootstrap"><span class="label">P0</span><span class="gpio">GPIO0</span><span class="fn">bootstrap — evitar</span></div>
+      <div class="row bootstrap"><span class="label">P2</span><span class="gpio">GPIO2</span><span class="fn">bootstrap — evitar</span></div>
+      <div class="row bootstrap"><span class="label">P15</span><span class="gpio">GPIO15</span><span class="fn">bootstrap — evitar</span></div>
+      <div class="row danger"><span class="label">SD1</span><span class="gpio">SPI flash</span><span class="fn">nunca conectar</span></div>
+      <div class="row danger"><span class="label">SD0</span><span class="gpio">SPI flash</span><span class="fn">nunca conectar</span></div>
+      <div class="row danger"><span class="label">CLK</span><span class="gpio">SPI flash</span><span class="fn">nunca conectar</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="note" style="border-left-color:var(--danger);">
+  <b>P12 aparece dos veces marcado</b>: en la lista de "pines a evitar" de
+  <code>CLAUDE.md</code> (bootstrap — en alto al arrancar puede impedir el boot) y
+  en la asignación de este pinout no lo usamos para nada — quedó libre a propósito.
+  Si en algún momento hace falta un pin más, <b>P12 es el último candidato</b>, no
+  el primero.
+</div>
+
+<div class="table-wrap">
+<table>
+  <caption>Resumen — solo pines usados en el proyecto</caption>
+  <thead><tr><th>GPIO</th><th>Etiqueta</th><th>Función</th></tr></thead>
+  <tbody>
+    <tr><td>21</td><td>P21</td><td>I2C SDA → GY-521</td></tr>
+    <tr><td>22</td><td>P22</td><td>I2C SCL → GY-521</td></tr>
+    <tr><td>32</td><td>P32</td><td>Encoder M1, canal A</td></tr>
+    <tr><td>33</td><td>P33</td><td>Encoder M1, canal B</td></tr>
+    <tr><td>25</td><td>P25</td><td>Encoder M2, canal A</td></tr>
+    <tr><td>26</td><td>P26</td><td>Encoder M2, canal B</td></tr>
+    <tr><td>27</td><td>P27</td><td>ENA — PWM Motor 1</td></tr>
+    <tr><td>14</td><td>P14</td><td>IN1 — dirección Motor 1</td></tr>
+    <tr><td>13</td><td>P13</td><td>IN2 — dirección Motor 1</td></tr>
+    <tr><td>4</td><td>P4</td><td>ENB — PWM Motor 2</td></tr>
+    <tr><td>16</td><td>P16</td><td>IN3 — dirección Motor 2</td></tr>
+    <tr><td>17</td><td>P17</td><td>IN4 — dirección Motor 2</td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer>
+  Fuente: <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code> del proyecto robot_balanceador.
+  Este archivo es una ayuda visual — ante cualquier discrepancia, la fuente de verdad sigue siendo esa documentación.
+</footer>
+
+</body>
+</html>

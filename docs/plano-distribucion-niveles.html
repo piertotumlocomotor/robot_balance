@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Distribución de niveles — chasis de balsa</title>
+<meta name="description" content="Plantas a escala de los niveles con drivers separados en su propio nivel, los 4 ya cortados a 150mm.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f4f5f8;
+    --used:#1f7a3d; --used-bg:#e9f7ee;
+    --bridge:#6b3fa0; --bridge-bg:#f2ecfa;
+    --danger:#b3261e; --danger-bg:#fbeceb;
+    --boot:#9a5b0e; --boot-bg:#fdf1e2;
+    --power:#8a6d00; --power-bg:#fbf6dc;
+    --free:#9aa0ad; --free-bg:#f7f7f8;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:.9rem 1.1rem; max-width:1180px; margin-inline:auto; line-height:1.35; font-size:14px;
+  }
+  h1{font-size:1.15rem; margin:0 0 .1rem; text-wrap:balance;}
+  .sub{color:var(--dim); font-size:.78rem; margin-bottom:.6rem;}
+  .note{
+    background:var(--panel); border:1px solid var(--rule); border-left:3px solid var(--boot);
+    border-radius:5px; padding:.5rem .7rem; font-size:.74rem; color:var(--dim); margin-bottom:.7rem;
+  }
+  .note b{color:var(--ink);}
+  .note.pending{border-left-color:var(--danger);}
+  .note.done{border-left-color:var(--used);}
+
+  .legend{display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.8rem; font-size:.68rem;}
+  .chip{
+    font-family:var(--mono); padding:.15rem .5rem; border-radius:14px; border:1px solid var(--rule);
+    display:inline-flex; align-items:center; gap:.3rem;
+  }
+  .chip.used{color:var(--used); background:var(--used-bg); border-color:var(--used);}
+  .chip.bridge{color:var(--bridge); background:var(--bridge-bg); border-color:var(--bridge);}
+  .chip.danger{color:var(--danger); background:var(--danger-bg); border-color:var(--danger);}
+  .chip.boot{color:var(--boot); background:var(--boot-bg); border-color:var(--boot);}
+  .chip.power{color:var(--power); background:var(--power-bg); border-color:var(--power);}
+  .chip.free{color:var(--faint); background:var(--free-bg); border-color:var(--rule);}
+
+  h2{font-size:.9rem; margin:1.1rem 0 .5rem; padding-top:.6rem; border-top:1px solid var(--rule);}
+  h2 .n{font-family:var(--mono); color:var(--faint); font-weight:400; font-size:.72rem;}
+
+  .plans{display:grid; grid-template-columns:repeat(4,1fr); gap:.7rem;}
+  .plan-card{border:1px solid var(--rule); border-radius:6px; padding:.5rem .5rem .6rem; background:#fff;}
+  .plan-title{font-family:var(--mono); font-size:.66rem; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); margin-bottom:.3rem; text-align:center;}
+  .plan-svg-wrap{display:flex; justify-content:center;}
+  .plan-svg-wrap svg{width:100%; max-width:210px; height:auto;}
+  .plan-foot{font-size:.66rem; color:var(--faint); text-align:center; margin-top:.35rem;}
+
+  figure{margin:.6rem 0 0;}
+  figure.wide{overflow-x:auto;}
+  figcaption{font-size:.72rem; color:var(--dim); margin-top:.35rem;}
+  .elev-wrap{display:flex; justify-content:center;}
+  .elev-wrap svg{width:100%; max-width:460px; height:auto;}
+  .cut-wrap svg{width:100%; height:auto; display:block; margin-bottom:.5rem;}
+
+  svg text{font-family:var(--mono);}
+  .board-outline{fill:var(--panel); stroke:var(--rule); stroke-width:.6;}
+  .corner-patch{fill:var(--power-bg); stroke:var(--power); stroke-width:.5; stroke-dasharray:1.4 1;}
+  .rod-hole{fill:var(--bg); stroke:var(--ink); stroke-width:.5;}
+  .comp{stroke-width:.6;}
+  .comp.motor{fill:var(--used-bg); stroke:var(--used);}
+  .comp.battery{fill:var(--used-bg); stroke:var(--used);}
+  .comp.buck{fill:var(--used-bg); stroke:var(--used);}
+  .comp.switch{fill:var(--used-bg); stroke:var(--used);}
+  .comp.driver{fill:var(--used-bg); stroke:var(--used);}
+  .comp.proto{fill:var(--used-bg); stroke:var(--used);}
+  .comp.mpu{fill:var(--bridge-bg); stroke:var(--bridge); stroke-width:.5;}
+  .comp.tab{fill:var(--boot-bg); stroke:var(--boot); stroke-width:.5;}
+  .mhole{fill:var(--bg); stroke:var(--used); stroke-width:.4;}
+  .lbl{fill:var(--ink); font-size:3.4px; text-anchor:middle;}
+  .lbl.sm{font-size:2.6px; fill:var(--dim);}
+  .lbl.tag{font-size:2.4px; fill:var(--faint); text-transform:uppercase; letter-spacing:.03em;}
+  .dim{stroke:var(--faint); stroke-width:.35; fill:none;}
+  .dim-txt{font-size:2.8px; fill:var(--faint); text-anchor:middle;}
+
+  table{width:100%; border-collapse:collapse; font-size:.72rem; margin-top:.3rem;}
+  th{text-align:left; font-family:var(--mono); font-size:.6rem; text-transform:uppercase; color:var(--dim); border-bottom:1px solid var(--rule); padding:.28rem .4rem;}
+  td{padding:.26rem .4rem; border-bottom:1px solid var(--rule); font-variant-numeric:tabular-nums;}
+  td.warn{color:var(--boot);}
+  tfoot td{font-weight:700; border-top:1.5px solid var(--ink); border-bottom:none;}
+
+  .checklist{list-style:none; margin:.3rem 0 0; padding:0; display:flex; flex-direction:column; gap:.3rem;}
+  .checklist li{font-size:.74rem; display:flex; gap:.4rem; align-items:flex-start;}
+  .checklist li::before{content:"☐"; color:var(--boot); flex-shrink:0;}
+
+  footer{color:var(--faint); font-size:.66rem; margin-top:1.1rem; padding-top:.5rem; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:0 .4rem; font-size:11.5px;}
+    .plans{grid-template-columns:repeat(4,1fr);}
+    @page{ size:A4 landscape; margin:9mm; }
+  }
+  @media (max-width:900px){
+    .plans{grid-template-columns:repeat(2,1fr);}
+  }
+  @media (max-width:480px){
+    .plans{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<h1>Distribución de niveles — chasis de balsa</h1>
+<div class="sub">Actualizado 2026-08-29 · drivers en nivel propio · 4 niveles, los 4 ya cortados a 76×150mm · listones 915×76×10mm de balsa</div>
+
+<div class="note done">
+  <b>Arquitectura revisada 2026-08-28/29:</b> los BTS7960 dejan de compartir cara con el MPU o con los motores —
+  pasan a su <b>propio nivel (N3)</b>. Esto elimina de un saque los tres conflictos de espacio que veníamos
+  parchando (motor+driver, MPU+driver, cuerpo del motor+borneras del driver). El motor vuelve a anclarse
+  <b>directo sobre N1</b> — los soportes de 65mm y los recortes de disipador quedan obsoletos.
+</div>
+
+<div class="note">
+  <b>Por qué este orden:</b> pesado abajo, liviano arriba — cada centímetro que sube un componente le cuesta
+  margen de recuperación al robot (θmax = τ/(m·g·l), ver <code>CLAUDE.md</code>). Los 4 niveles ya están cortados
+  a <b>150mm</b> — este plano diseña el contenido de cada uno para que entre en esa medida fija, no al revés.
+</div>
+
+<div class="legend">
+  <span class="chip used">componente montado</span>
+  <span class="chip bridge">componente liviano / protoboard</span>
+  <span class="chip power">refuerzo (parche pegado antes de perforar)</span>
+  <span class="chip boot">pestaña / accesorio en el borde</span>
+  <span class="chip free">agujero de varilla Ø5.3mm</span>
+</div>
+
+<h2>Plantas a escala <span class="n">1mm = 1 unidad de dibujo · 76×150mm en los cuatro niveles, ya cortados</span></h2>
+
+<div class="plans">
+
+  <div class="plan-card">
+    <div class="plan-title">Nivel 1 — sobre el eje</div>
+    <div class="plan-svg-wrap">
+      <svg viewBox="0 0 76 150" role="img" aria-label="Planta del nivel 1: motor A anclado directo al borde superior, motor B al borde inferior, MPU6050 sobre su protoboard centrado entre ambos">
+        <rect class="board-outline" x="0" y="0" width="76" height="150" rx="1"/>
+        <rect class="corner-patch" x="2" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="2" y="134" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="134" width="14" height="14"/>
+        <circle class="rod-hole" cx="9" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="9" cy="141" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="141" r="2.7"/>
+
+        <rect class="comp motor" x="18" y="0" width="40" height="40"/>
+        <circle class="mhole" cx="25.75" cy="4.8" r="2"/>
+        <circle class="mhole" cx="50.25" cy="4.8" r="2"/>
+        <circle class="mhole" cx="25.75" cy="35.2" r="2"/>
+        <circle class="mhole" cx="50.25" cy="35.2" r="2"/>
+        <text class="lbl sm" x="38" y="22">MOTOR A</text>
+        <text class="lbl tag" x="38" y="27">brida 40×40 al ras</text>
+
+        <rect class="comp mpu" x="15" y="57.5" width="46" height="35"/>
+        <text class="lbl" x="38" y="73">MPU6050</text>
+        <text class="lbl sm" x="38" y="79">protoboard 35×46</text>
+
+        <rect class="comp motor" x="18" y="110" width="40" height="40"/>
+        <circle class="mhole" cx="25.75" cy="114.8" r="2"/>
+        <circle class="mhole" cx="50.25" cy="114.8" r="2"/>
+        <circle class="mhole" cx="25.75" cy="145.2" r="2"/>
+        <circle class="mhole" cx="50.25" cy="145.2" r="2"/>
+        <text class="lbl sm" x="38" y="126">brida 40×40 al ras</text>
+        <text class="lbl" x="38" y="132">MOTOR B</text>
+      </svg>
+    </div>
+    <div class="plan-foot">Motores cara inferior · MPU cara superior · 40+17.5+35+17.5+40=150 exacto</div>
+  </div>
+
+  <div class="plan-card">
+    <div class="plan-title">Nivel 2 — batería + buck + switch</div>
+    <div class="plan-svg-wrap">
+      <svg viewBox="0 0 76 150" role="img" aria-label="Planta del nivel 2: batería, buck y switch girados para minimizar el largo, apilados en línea, con margen de sobra">
+        <rect class="board-outline" x="0" y="0" width="76" height="150" rx="1"/>
+        <rect class="corner-patch" x="2" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="2" y="134" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="134" width="14" height="14"/>
+        <circle class="rod-hole" cx="9" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="9" cy="141" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="141" r="2.7"/>
+
+        <rect class="comp battery" x="2" y="10" width="72" height="35"/>
+        <text class="lbl" x="38" y="26">BATERÍA 3S</text>
+        <text class="lbl sm" x="38" y="32">72×35 · 72 transversal</text>
+
+        <rect class="comp buck" x="6" y="55" width="64" height="47"/>
+        <text class="lbl" x="38" y="76">XL4016</text>
+        <text class="lbl sm" x="38" y="82">64×47 · 64 transversal</text>
+
+        <rect class="comp switch" x="15.25" y="112" width="45.5" height="28.6"/>
+        <text class="lbl" x="38" y="127">SWITCH</text>
+        <text class="lbl sm" x="38" y="133">45.5×28.6</text>
+
+        <text class="lbl tag" x="38" y="146" fill="var(--boot)">fusible: cara inferior, a tu criterio</text>
+      </svg>
+    </div>
+    <div class="plan-foot">Batería/buck/switch girados 90° · sin apriete, margen de sobra</div>
+  </div>
+
+  <div class="plan-card">
+    <div class="plan-title">Nivel 3 — drivers de motor</div>
+    <div class="plan-svg-wrap">
+      <svg viewBox="0 0 76 150" role="img" aria-label="Planta del nivel 3: dos BTS7960 escalonados, montados directo arriba, sin recorte porque ya no comparten cara con nada">
+        <rect class="board-outline" x="0" y="0" width="76" height="150" rx="1"/>
+        <rect class="corner-patch" x="2" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="2" y="134" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="134" width="14" height="14"/>
+        <circle class="rod-hole" cx="9" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="9" cy="141" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="141" r="2.7"/>
+
+        <rect class="comp driver" x="13" y="16" width="50" height="50"/>
+        <text class="lbl" x="38" y="38">BTS7960 · M1</text>
+        <text class="lbl sm" x="38" y="44">50×50 · disip.↑</text>
+
+        <rect class="comp driver" x="13" y="84" width="50" height="50"/>
+        <text class="lbl" x="38" y="106">BTS7960 · M2</text>
+        <text class="lbl sm" x="38" y="112">50×50 · disip.↑</text>
+
+        <line class="dim" x1="66" y1="66" x2="66" y2="84"/>
+        <text class="dim-txt" x="70" y="76" text-anchor="start">18mm</text>
+      </svg>
+    </div>
+    <div class="plan-foot">Montados directo arriba de N3 — sin recorte, sin compartir cara con nada</div>
+  </div>
+
+  <div class="plan-card">
+    <div class="plan-title">Nivel 4 — ESP32 + protoboard</div>
+    <div class="plan-svg-wrap">
+      <svg viewBox="0 0 76 150" role="img" aria-label="Planta del nivel 4: protoboard del ESP32 girada 90 grados, centrada con margen amplio a ambos lados">
+        <rect class="board-outline" x="0" y="0" width="76" height="150" rx="1"/>
+        <rect class="corner-patch" x="2" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="2" width="14" height="14"/>
+        <rect class="corner-patch" x="2" y="134" width="14" height="14"/>
+        <rect class="corner-patch" x="60" y="134" width="14" height="14"/>
+        <circle class="rod-hole" cx="9" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="9" r="2.7"/>
+        <circle class="rod-hole" cx="9" cy="141" r="2.7"/>
+        <circle class="rod-hole" cx="67" cy="141" r="2.7"/>
+
+        <rect class="comp tab" x="28" y="20" width="20" height="10"/>
+        <text class="lbl tag" x="38" y="27" text-anchor="middle">USB-C ↑</text>
+
+        <rect class="comp proto" x="10" y="33" width="56" height="84"/>
+        <text class="lbl" x="38" y="72">PROTOBOARD</text>
+        <text class="lbl sm" x="38" y="78">+ ESP32</text>
+        <text class="lbl sm" x="38" y="84">84×56 girada</text>
+      </svg>
+    </div>
+    <div class="plan-foot">Protoboard 84×56 girada · margen amplio a ambos lados (33mm)</div>
+  </div>
+
+</div>
+
+<h2>Corte vertical del stack <span class="n">de qué depende cada separación entre niveles</span></h2>
+
+<figure class="wide">
+  <div class="elev-wrap">
+    <svg viewBox="-5 -35 165 235" role="img" aria-label="Corte vertical: rueda y eje abajo, nivel 1 con motores directo sobre el eje, hueco de 20mm, nivel 2 con batería y buck, hueco de 35mm, nivel 3 con los drivers, hueco de 35mm sin confirmar por la altura del driver, nivel 4 con el ESP32 arriba de todo">
+      <line x1="0" y1="183" x2="150" y2="183" class="dim" stroke-width=".7"/>
+      <text class="dim-txt" x="18" y="190" text-anchor="start">piso</text>
+      <circle cx="60" cy="150" r="33" fill="none" stroke="var(--rule)" stroke-width="1.4"/>
+      <circle cx="60" cy="150" r="2" fill="var(--faint)"/>
+      <text class="lbl sm" x="60" y="196" text-anchor="middle">rueda Ø66 (r=33 medido)</text>
+
+      <rect x="20" y="115" width="80" height="10" fill="var(--used-bg)" stroke="var(--used)" stroke-width=".6"/>
+      <text class="lbl sm" x="60" y="122" text-anchor="middle">N1 · motores + MPU</text>
+
+      <rect x="35" y="95" width="10" height="20" fill="var(--panel)" stroke="var(--rule)" stroke-width=".5" stroke-dasharray="1.5 1"/>
+      <text class="lbl tag" x="48" y="107" text-anchor="start">MPU + aire ≈20mm</text>
+
+      <rect x="20" y="85" width="80" height="10" fill="var(--used-bg)" stroke="var(--used)" stroke-width=".6"/>
+      <text class="lbl sm" x="60" y="92" text-anchor="middle">N2 · batería + buck + switch</text>
+
+      <rect x="30" y="50" width="30" height="35" fill="var(--panel)" stroke="var(--rule)" stroke-width=".5" stroke-dasharray="1.5 1"/>
+      <text class="lbl tag" x="63" y="67" text-anchor="start">batería/buck ≈35mm</text>
+
+      <rect x="20" y="40" width="80" height="10" fill="var(--used-bg)" stroke="var(--used)" stroke-width=".6"/>
+      <text class="lbl sm" x="60" y="47" text-anchor="middle">N3 · drivers</text>
+
+      <rect x="32" y="5" width="16" height="35" fill="var(--panel)" stroke="var(--danger)" stroke-width=".5" stroke-dasharray="1.5 1"/>
+      <text class="lbl tag" x="50" y="22" text-anchor="start" fill="var(--danger)">driver+disip. ≈35mm — SIN CONFIRMAR</text>
+
+      <rect x="20" y="-5" width="80" height="10" fill="var(--used-bg)" stroke="var(--used)" stroke-width=".6"/>
+      <text class="lbl sm" x="60" y="2" text-anchor="middle">N4 · ESP32 + protoboard</text>
+
+      <line x1="35" y1="128" x2="35" y2="-18" class="dim" stroke-width=".6"/>
+      <line x1="95" y1="128" x2="95" y2="-18" class="dim" stroke-width=".6"/>
+      <text class="lbl tag" x="35" y="133" text-anchor="middle">varilla</text>
+      <text class="lbl tag" x="95" y="133" text-anchor="middle">varilla</text>
+
+      <g stroke="var(--faint)" stroke-width=".8">
+        <line x1="112" y1="125" x2="118" y2="125"/><line x1="112" y1="115" x2="118" y2="115"/>
+        <line x1="115" y1="125" x2="115" y2="115"/>
+        <text class="dim-txt" x="128" y="121" fill="var(--faint)">10</text>
+
+        <line x1="112" y1="115" x2="118" y2="115"/><line x1="112" y1="95" x2="118" y2="95"/>
+        <line x1="115" y1="115" x2="115" y2="95"/>
+        <text class="dim-txt" x="128" y="106" fill="var(--faint)">20</text>
+
+        <line x1="112" y1="85" x2="118" y2="85"/><line x1="112" y1="50" x2="118" y2="50"/>
+        <line x1="115" y1="85" x2="115" y2="50"/>
+        <text class="dim-txt" x="128" y="68" fill="var(--faint)">35</text>
+
+        <line x1="112" y1="40" x2="118" y2="40"/><line x1="112" y1="5" x2="118" y2="5"/>
+        <line x1="115" y1="40" x2="115" y2="5"/>
+        <text class="dim-txt" x="128" y="23" fill="var(--danger)">35?</text>
+      </g>
+    </svg>
+  </div>
+  <figcaption>
+    N1→N2 la fija la altura del protoboard del MPU + margen; N2→N3 la fija lo más alto entre batería y buck
+    (26mm) + margen para la bornera del XL4016; N3→N4 la fija la altura del BTS7960 montado con su disipador —
+    <b>todavía sin medir</b>, usado 35mm como estimación provisoria (mismo orden que batería/buck). Se ajustan con
+    tuercas, no se cortan.
+  </figcaption>
+</figure>
+
+<h2>Estado de corte <span class="n">los 4 niveles ya están cortados — esto es registro, no instrucción</span></h2>
+
+<div class="note done">
+  Los 4 niveles (N1-N4) ya están cortados a <b>76×150mm</b> cada uno, sobre los 2 listones de 915×76×10mm.
+  Sobra material de sobra en los dos listones para un eventual N5 (carga), el cupón de densidad y los parches de
+  refuerzo.
+</div>
+
+<h2>Masa y margen <span class="n">⚠️ actualizado 2026-09-12 con la medición real — la proyección quedó 63% corta</span></h2>
+
+<div class="note" style="border-left:4px solid #b3261e">
+  <b>⚠️ Lo proyectado acá abajo NO se cumplió. Usar los valores medidos.</b>
+  El chasis armado se midió el 2026-09-10 por el método de dos apoyos (pivote libre en
+  el eje), con las ruedas sacadas — ver <code>conexiones-registro-pruebas.md</code> 7.23.
+</div>
+
+<table>
+  <thead><tr><th>Cantidad</th><th>Proyectado (2026-08-29)</th><th><b>MEDIDO (2026-09-10)</b></th><th>Diferencia</th></tr></thead>
+  <tbody>
+    <tr><td><code>m·l</code></td><td>≈ 0.064 kg·m</td><td><b>0.1040 kg·m</b></td><td><span class="warn">+63%</span></td></tr>
+    <tr><td><code>m</code></td><td>≈ 1058 g (con ruedas)</td><td><b>1150 g (sin ruedas)</b></td><td><span class="warn">subestimada</span></td></tr>
+    <tr><td><code>l</code> (brazo del CG)</td><td>≈ 6.0 cm implícito</td><td><b>9.04 cm</b></td><td><span class="warn">+50%</span></td></tr>
+    <tr><td><code>ω₀</code></td><td>no proyectado</td><td><b>8.0 ± 0.1 rad/s</b></td><td>—</td></tr>
+    <tr><td><code>J</code></td><td>no proyectado</td><td><b>0.0159 kg·m²</b></td><td>—</td></tr>
+  </tbody>
+  <tfoot>
+    <tr><td colspan="2">θmax con <code>m·l</code> medido (τ=0.079 N·m, dos motores en brake)</td><td><b>≈ 4.44°</b></td><td>era ≈7.2° proyectado</td></tr>
+    <tr><td colspan="2">Peor perturbación real medida (Test 10)</td><td>3.06°</td><td>—</td></tr>
+    <tr><td colspan="2">Margen real</td><td><b>≈ +45%</b></td><td>era ≈+136%</td></tr>
+  </tfoot>
+</table>
+
+<div class="note">
+  <b>Sigue siendo una mejora sobre el chasis viejo, pero mucho menor a la esperada.</b>
+  Con el mismo τ, el chasis de contrachapado daba θmax ≈ 3.65° (<code>m·l</code> =
+  0.1265 kg·m) y el de balsa da <b>≈ 4.44°</b> — una ganancia del 18%, no del 50% que
+  prometía la proyección. El margen contra la peor perturbación real pasa de +19% a
+  +45%.
+  <br><br>
+  <b>Por qué falló la proyección:</b> las masas marcadas como "sin confirmar" en la
+  tabla original (BTS7960, XL4016, switch, fusible, protoboard+ESP32+cableado, varillas)
+  estaban subestimadas — la masa total proyectada era 1058 g <i>con</i> ruedas y el robot
+  pesa 1150 g <i>sin</i> ellas. El error se concentró además en los niveles altos, que
+  es donde cada gramo pesa el doble en <code>m·l</code>.
+  <br><br>
+  <b>⚠️ El 4.44° es un piso, no el número final:</b> τ = 0.079 N·m se midió con el
+  <b>L298N</b>. Los BTS7960 (MOSFET, sin la caída de los BJT) deberían entregar más
+  torque al mismo duty, así que θmax real debería subir — pero <code>K_U</code> con el
+  driver nuevo <b>todavía no se midió</b>. Hasta entonces, usar 4.44° como cota
+  conservadora.
+</div>
+
+<details>
+  <summary><b>Proyección original (2026-08-29) — registro histórico, no usar para calcular</b></summary>
+  <table>
+    <thead><tr><th>Nivel</th><th>Placa (balsa, 76×150)</th><th>Componentes</th><th>Brazo aprox.</th><th>Aporte a m·l</th></tr></thead>
+    <tbody>
+      <tr><td>N1</td><td>~19g</td><td>MPU6050+protoboard ~5g (motores en la fila de abajo)</td><td>~3cm</td><td>~0.0007 kg·m</td></tr>
+      <tr><td>N2</td><td>~19g</td><td>Batería 123g + XL4016 <span class="warn">~60g</span> + switch <span class="warn">~20g</span> + fusible <span class="warn">~5g</span></td><td>~6cm</td><td>~0.0136 kg·m</td></tr>
+      <tr><td>N3</td><td>~19g</td><td>2× BTS7960 <span class="warn">~130g (pesar)</span></td><td>~10.5cm</td><td>~0.0156 kg·m</td></tr>
+      <tr><td>N4</td><td>~19g</td><td>Protoboard+ESP32+cableado <span class="warn">~90g</span></td><td>~15cm</td><td>~0.0164 kg·m</td></tr>
+      <tr><td>—</td><td colspan="2">Motores+ruedas 409g + 4 varillas <span class="warn">~110g</span> + tuercas/arandelas ~30g</td><td>~2-7.5cm</td><td>~0.0177 kg·m</td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="4">m·l proyectado</td><td>≈ 0.064 kg·m <span class="warn">(real: 0.1040)</span></td></tr>
+      <tr><td colspan="4">θmax proyectado</td><td>≈ 7.2° <span class="warn">(real: 4.44°)</span></td></tr>
+      <tr><td colspan="4">Margen proyectado</td><td>≈ +136% <span class="warn">(real: +45%)</span></td></tr>
+    </tfoot>
+  </table>
+  <p class="n">Balsa 0.16 g/cm³ asumida, sin confirmar con el cupón de densidad. Se
+  conserva para poder rastrear qué estimación falló — las masas marcadas en naranja
+  nunca se pesaron, y son las que explican la diferencia.</p>
+</details>
+
+<div class="note pending">
+  <b>Confirmar antes de dar el diseño por cerrado:</b>
+  <ul class="checklist">
+    <li>Pesar los 2 módulos BTS7960 con disipador, el XL4016, el switch, el fusible, y el conjunto protoboard+ESP32+cableado.</li>
+    <li><b>Medir la altura del BTS7960 montado (driver + disipador) sobre N3</b> — define el hueco N3→N4, hoy es una estimación sin confirmar.</li>
+    <li>Cortar el cupón de densidad de la balsa (60×20mm) y pesarlo — confirmar 0.16 g/cm³.</li>
+    <li>Preparar los 16 parches de refuerzo (4 por nivel × 4 niveles) antes de perforar las esquinas.</li>
+    <li>Insertos roscados o tuerca-pasante para los tornillos de montaje del motor y del BTS7960 — nunca autorroscante en balsa.</li>
+    <li>Definir la ubicación exacta del fusible en la cara inferior de N2 (a criterio del usuario).</li>
+    <li>Definir si el entrenamiento de RL corre primero en simulación o directo en hardware — decide si hace falta reforzar los cantos de N1 contra caídas repetidas.</li>
+    <li>Decidir si se suma N5 (carga) — sin definir todavía, hay material de sobra para cortarlo si hace falta.</li>
+  </ul>
+</div>
+
+<footer>
+  Generado 2026-08-24, reescrito 2026-08-28/29 (drivers a nivel propio, arquitectura de 4 niveles (N1-N4) ya
+  cortados a 150mm). Ante cualquier discrepancia con el robot real, la fuente de verdad es <code>CLAUDE.md</code>
+  y <code>docs/conexiones-registro-pruebas.md</code>, no este archivo. Escalas esquemáticas (1 unidad ≈ 1mm) —
+  verificar contra el módulo físico antes de perforar.
+</footer>
+
+</body>
+</html>

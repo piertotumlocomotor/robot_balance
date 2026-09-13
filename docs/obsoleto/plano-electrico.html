@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[OBSOLETO] Plano eléctrico — Robot Balanceador</title>
+<meta name="description" content="OBSOLETO (2026-08-29) — describe la arquitectura con L298N, reemplazada por 2x BTS7960. Conservado como referencia histórica.">
+<style>
+  :root{
+    --bg:#12151c; --bg-panel:#191e28; --bg-inset:#0d0f15;
+    --ink:#e9e6df; --ink-dim:#9aa0ad; --ink-faint:#6b7180;
+    --rule:#2a3040;
+    --batt:#d1554a;
+    --v5:#e0c34a;
+    --v33:#5b9fd9;
+    --sig:#4fae63;
+    --gnd:#9aa0ad;
+    --res:#c98a3f;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:1rem; max-width:920px; margin-inline:auto; line-height:1.5;
+  }
+  h1{font-size:1.25rem; margin:.2rem 0 0;}
+  h2{font-size:.95rem; margin:1.6rem 0 .6rem; padding-top:.9rem; border-top:1px solid var(--rule); color:var(--ink);}
+  .sub{color:var(--ink-dim); font-size:.82rem; margin-bottom:1rem;}
+  .note{
+    background:var(--bg-panel); border:1px solid var(--rule); border-left:3px solid var(--v5);
+    border-radius:6px; padding:.8rem 1rem; font-size:.83rem; color:var(--ink-dim); margin-bottom:1.1rem;
+  }
+  .note.key{border-left-color:var(--res);}
+  .note b{color:var(--ink);}
+
+  .legend{display:flex; flex-wrap:wrap; gap:.45rem; margin-bottom:1.1rem;}
+  .chip{
+    font-family:var(--mono); font-size:.68rem; padding:.22rem .55rem; border-radius:20px;
+    display:flex; align-items:center; gap:.35rem; border:1px solid var(--rule);
+  }
+  .chip .dot{width:8px; height:8px; border-radius:50%;}
+  .chip.batt{color:var(--batt); border-color:rgba(209,85,74,.4); background:rgba(209,85,74,.1);}
+  .chip.batt .dot{background:var(--batt);}
+  .chip.v5{color:var(--v5); border-color:rgba(224,195,74,.4); background:rgba(224,195,74,.1);}
+  .chip.v5 .dot{background:var(--v5);}
+  .chip.v33{color:var(--v33); border-color:rgba(91,159,217,.4); background:rgba(91,159,217,.1);}
+  .chip.v33 .dot{background:var(--v33);}
+  .chip.sig{color:var(--sig); border-color:rgba(79,174,99,.4); background:rgba(79,174,99,.1);}
+  .chip.sig .dot{background:var(--sig);}
+  .chip.gnd{color:var(--gnd); border-color:var(--rule); background:rgba(255,255,255,.04);}
+  .chip.gnd .dot{background:var(--gnd);}
+  .chip.res{color:var(--res); border-color:rgba(201,138,63,.4); background:rgba(201,138,63,.1);}
+  .chip.res .dot{background:var(--res);}
+
+  /* --- flujo de alimentación --- */
+  .flow{display:flex; flex-direction:column; align-items:center; gap:0; margin-bottom:1rem;}
+  .fbox{
+    background:var(--bg-panel); border:1px solid var(--rule); border-radius:8px;
+    padding:.6rem 1rem; font-size:.82rem; text-align:center; min-width:220px;
+  }
+  .fbox b{display:block; font-family:var(--mono); font-size:.85rem; margin-bottom:.15rem;}
+  .fbox.batt{border-color:rgba(209,85,74,.5); background:rgba(209,85,74,.08);}
+  .fbox.v5{border-color:rgba(224,195,74,.5); background:rgba(224,195,74,.08);}
+  .fbox.v33{border-color:rgba(91,159,217,.5); background:rgba(91,159,217,.08);}
+  .fbox.star{border-color:var(--ink-dim);}
+  .arrow{color:var(--ink-faint); font-size:1rem; line-height:1.6;}
+  .fsplit{display:flex; gap:1.2rem; justify-content:center; flex-wrap:wrap; width:100%;}
+  .fbranch{display:flex; flex-direction:column; align-items:center; gap:0; flex:1; min-width:230px;}
+  .capnote{
+    font-family:var(--mono); font-size:.68rem; color:var(--res); background:rgba(201,138,63,.1);
+    border:1px dashed rgba(201,138,63,.4); border-radius:5px; padding:.2rem .5rem; margin-top:.3rem;
+  }
+
+  /* --- tabla de senales --- */
+  table{width:100%; border-collapse:collapse; font-size:.82rem; margin-top:.3rem;}
+  caption{text-align:left; font-family:var(--mono); font-size:.68rem; color:var(--ink-faint); margin-bottom:.4rem; text-transform:uppercase; letter-spacing:.05em;}
+  th{text-align:left; font-family:var(--mono); font-size:.65rem; text-transform:uppercase; color:var(--ink-dim); border-bottom:1px solid var(--rule); padding:.35rem .45rem;}
+  td{padding:.35rem .45rem; border-bottom:1px solid var(--rule);}
+  tr:last-child td{border-bottom:none;}
+  .table-wrap{overflow-x:auto; margin-bottom:1.2rem;}
+
+  /* --- L298N detalle pull-down --- */
+  .pin-wrap{overflow-x:auto; padding-bottom:.3rem;}
+  .pindiagram{display:flex; flex-direction:column; gap:6px; margin-bottom:1rem; min-width:520px;}
+  .pinrow{
+    display:grid; grid-template-columns: 130px 1fr 90px 90px; align-items:center; gap:.6rem;
+    background:var(--bg-panel); border:1px solid var(--rule); border-radius:6px; padding:.5rem .7rem;
+    font-size:.8rem;
+  }
+  .pinrow .origin{font-family:var(--mono); color:var(--sig); font-weight:700;}
+  .pinrow .wire{color:var(--ink-faint); font-family:var(--mono); font-size:.75rem;}
+  .pinrow .pin{font-family:var(--mono); font-weight:800; text-align:center; padding:.2rem .4rem; border-radius:5px;}
+  .pinrow.in .pin{background:rgba(201,138,63,.15); color:var(--res); border:1px solid rgba(201,138,63,.4);}
+  .pinrow.en .pin{background:rgba(79,174,99,.12); color:var(--sig); border:1px solid rgba(79,174,99,.35);}
+  .pinrow .res{display:flex; align-items:center; gap:.3rem; font-family:var(--mono); font-size:.72rem; color:var(--res);}
+  .pinrow .res svg{flex:none;}
+  .pinrow .none{color:var(--ink-faint); font-size:.72rem; text-align:center;}
+  .header-row{
+    display:grid; grid-template-columns: 130px 1fr 90px 90px; gap:.6rem; padding:0 .7rem;
+    font-family:var(--mono); font-size:.62rem; text-transform:uppercase; color:var(--ink-faint); letter-spacing:.05em;
+    min-width:520px;
+  }
+
+  footer{color:var(--ink-faint); font-size:.75rem; margin-top:1.6rem; padding-top:1rem; border-top:1px solid var(--rule);}
+</style>
+</head>
+<body>
+<div style="background:#fbeceb;border:3px solid #b3261e;border-radius:6px;padding:14px 18px;margin:0 0 22px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#181c24;line-height:1.5">
+  <div style="font-size:1.05rem;font-weight:800;color:#b3261e;margin-bottom:6px">&#9940; DOCUMENTO DEPRECADO &mdash; PLANTA VIEJA</div>
+  <p style="margin:6px 0;font-size:.9rem">
+    Describe el robot <b>anterior al rearmado</b>: alimentaci&oacute;n y se&ntilde;ales con arquitectura <b>L298N</b>. Reemplazado por <code>plano-potencia.html</code> + <code>plano-senales.html</code>. Ese robot <b>ya no existe</b>.
+  </p>
+  <p style="margin:6px 0;font-size:.9rem">
+    <b>No usar para cablear, construir ni calcular.</b> Se conserva solo para repasar errores
+    y decisiones de esa etapa.
+  </p>
+  <p style="margin:6px 0 0;font-size:.85rem;color:#4b5563">
+    Documentaci&oacute;n vigente: <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code>
+    (filas del protoboard en <b>&sect;3.1b</b>). Planos vigentes: <code>docs/plano-potencia.html</code>,
+    <code>docs/plano-senales.html</code>, <code>docs/plano-distribucion-niveles.html</code>,
+    <code>docs/plantilla-imprimible-niveles.html</code>.
+  </p>
+</div>
+
+
+<div class="note key" style="border-left-color:#d1554a; font-size:.9rem;">
+  ⛔ <b>OBSOLETO (2026-08-29) — describe el driver L298N, reemplazado por 2× BTS7960.</b>
+  No usar para cablear. Vigentes: <code>../plano-potencia.html</code> (alimentación) y
+  <code>../plano-senales.html</code> (señales, incluye los pull-downs de seguridad ya adaptados
+  al pin <code>EN</code> del driver nuevo). Conservado como referencia histórica — toda la
+  caracterización de torque vigente (K_U, θ_umbral, ganancias del PSO) se midió con este driver.
+</div>
+
+<h1>Plano eléctrico — Robot Balanceador <span style="color:#d1554a;">[OBSOLETO]</span></h1>
+<div class="sub">Alimentación completa + señales de control + detalle de pull-downs del L298N — arquitectura reemplazada</div>
+
+<div class="note key">
+  <b>Este archivo responde puntualmente una duda</b>: cómo se suman las 4
+  resistencias de pull-down al L298N. Ver "L298N — pines de control y
+  pull-downs" más abajo. El resto del plano son las conexiones ya cerradas en
+  <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code>,
+  reunidas acá en un solo diagrama para no tener que reconstruir el árbol
+  completo de memoria. Para el detalle fila-por-fila del protoboard del ESP32,
+  ver <code>pinout-esp32.html</code> y <code>plano-protoboard-esp32.html</code>
+  — este documento no repite esos números de fila.
+</div>
+
+<div class="legend">
+  <span class="chip batt"><span class="dot"></span>Batería / potencia (hasta 12.6V)</span>
+  <span class="chip v5"><span class="dot"></span>Riel 5V lógico</span>
+  <span class="chip v33"><span class="dot"></span>Riel 3V3</span>
+  <span class="chip sig"><span class="dot"></span>Señal / GPIO</span>
+  <span class="chip gnd"><span class="dot"></span>GND</span>
+  <span class="chip res"><span class="dot"></span>Resistencia / capacitor</span>
+</div>
+
+<h2>1. Alimentación</h2>
+
+<div class="flow">
+  <div class="fbox batt"><b>Batería LiPo 3S</b>11.1V nominal, hasta 12.6V llena · XT60</div>
+  <div class="arrow">▼</div>
+  <div class="fbox batt">Fusible 10A — Switch (en serie con V+)</div>
+  <div class="arrow">▼</div>
+  <div class="fbox star"><b>Nodo estrella</b>Bornera V+ · Bornera GND</div>
+  <div class="arrow">▼</div>
+  <div class="fsplit">
+    <div class="fbranch">
+      <div class="fbox batt">Buck XL4016<br>IN+ / IN−</div>
+      <div class="arrow">▼</div>
+      <div class="fbox v5"><b>OUT: 4.98V</b>riel 5V lógico + riel GND lógico<br>(GND lógico y GND potencia se unen solo acá, en el nodo estrella)</div>
+      <div class="capnote" style="border-style:solid;">✅ C5 — 1000µF, instalado 2026-08-05 en las terminales de salida del Buck, <b>antes</b> de que el riel se divida hacia el L298N (cable propio) y hacia el riel del ESP32 (bornera intermedia) — protege ambas ramas con un solo capacitor</div>
+    </div>
+    <div class="fbranch">
+      <div class="fbox batt">L298N ①<br>VIN+ / GND (potencia)</div>
+      <div class="capnote">C1 — 1000µF, ⚠️16V (pendiente 25V/35V) — acá, en la bornera VIN+/GND</div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+  <div class="fsplit">
+    <div class="fbranch">
+      <div class="fbox v5">Riel 5V lógico →<br><b>L298N ① pin "5V"</b> (lógica interna)<br><span style="color:var(--ink-faint); font-size:.7rem;">mismo módulo que arriba — dos conexiones distintas, potencia y lógica</span></div>
+    </div>
+    <div class="fbranch">
+      <div class="fbox v5">Riel 5V lógico →<br><b>ESP32 pin 5V (VIN)</b></div>
+      <div class="capnote">C4 — 1000µF/25V, en el protoboard del ESP32 (fila 29↔21, ver plano-protoboard-esp32.html)</div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+  <div class="fbox v33"><b>Riel 3V3</b> (regulador propio del ESP32) → GY-521 VCC + Encoder M1 VCC + Encoder M2 VCC</div>
+  <div class="capnote">C6 — 100nF, junto al 3V3 en el protoboard del ESP32 (fila 20↔21)</div>
+  <div class="arrow">▼</div>
+  <div class="fbox v5">Riel GND lógico → GND del ESP32, GY-521, ambos encoders<br><span style="color:var(--batt); font-weight:700;">⚠️ el GND del ESP32 tiene que llegar hasta acá con un cable explícito — no basta con que el Serial por USB funcione (ver CLAUDE.md, "GND común ESP32↔L298N")</span></div>
+</div>
+
+<h2>2. Señales de control y datos (resumen)</h2>
+
+<div class="table-wrap">
+<table>
+  <caption>ESP32 → periféricos — detalle de fila en plano-protoboard-esp32.html</caption>
+  <thead><tr><th>Bloque</th><th>ESP32</th><th>Destino</th></tr></thead>
+  <tbody>
+    <tr><td>I2C</td><td>GPIO21 / GPIO22</td><td>GY-521 SDA / SCL</td></tr>
+    <tr><td>Encoder M1</td><td>GPIO32 / GPIO33</td><td>Canal A / Canal B</td></tr>
+    <tr><td>Encoder M2</td><td>GPIO25 / GPIO26</td><td>Canal A / Canal B</td></tr>
+    <tr><td>L298N — Motor 1</td><td>GPIO27 / GPIO14 / GPIO13</td><td>ENA / IN1 / IN2</td></tr>
+    <tr><td>L298N — Motor 2</td><td>GPIO4 / GPIO16 / GPIO17</td><td>ENB / IN3 / IN4</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>3. L298N — pines de control y pull-downs</h2>
+
+<div class="note">
+  <b>La duda que origina este plano</b>: los pull-down no reemplazan el cable
+  del ESP32 ni se "insertan en la línea" — van <b>en paralelo</b>, como una
+  segunda conexión desde el mismo pin. Una pata de cada resistencia va al
+  mismo punto donde llega el cable IN del ESP32 (directo en el pin del L298N,
+  no a mitad de camino en el protoboard); la otra pata va a GND. Mientras el
+  ESP32 maneja el pin activamente (alto o bajo), su salida domina sobre la
+  resistencia de 10kΩ — es una resistencia débil a propósito, para no
+  interferir con la señal normal. Solo cuando el ESP32 se resetea o cuelga
+  (pin en alta impedancia) el pull-down "gana" y fuerza el pin a GND.
+  <br><br>
+  <b>Por qué ENA/ENB no llevan resistencia</b>: con IN1 e IN2 (o IN3/IN4) en
+  bajo, la salida de ese puente H queda en rueda libre sin importar qué haga
+  ENA — alcanza con proteger las 4 líneas de dirección.
+</div>
+
+<div class="pin-wrap">
+<div class="header-row">
+  <span>Origen (ESP32)</span><span>Cable</span><span>Pin L298N</span><span>Pull-down</span>
+</div>
+<div class="pindiagram">
+  <div class="pinrow en">
+    <span class="origin">P27</span><span class="wire">──────────────▶</span><span class="pin">ENA</span><span class="none">— sin resistencia —</span>
+  </div>
+  <div class="pinrow in">
+    <span class="origin">P14</span><span class="wire">──────┬───────▶</span><span class="pin">IN1</span>
+    <span class="res">
+      <svg width="34" height="16" viewBox="0 0 34 16"><polyline points="0,8 5,8 8,2 12,14 16,2 20,14 24,2 28,8 34,8" fill="none" stroke="#c98a3f" stroke-width="1.6"/></svg>
+      10kΩ→GND
+    </span>
+  </div>
+  <div class="pinrow in">
+    <span class="origin">P13</span><span class="wire">──────┬───────▶</span><span class="pin">IN2</span>
+    <span class="res">
+      <svg width="34" height="16" viewBox="0 0 34 16"><polyline points="0,8 5,8 8,2 12,14 16,2 20,14 24,2 28,8 34,8" fill="none" stroke="#c98a3f" stroke-width="1.6"/></svg>
+      10kΩ→GND
+    </span>
+  </div>
+  <div class="pinrow in">
+    <span class="origin">P16</span><span class="wire">──────┬───────▶</span><span class="pin">IN3</span>
+    <span class="res">
+      <svg width="34" height="16" viewBox="0 0 34 16"><polyline points="0,8 5,8 8,2 12,14 16,2 20,14 24,2 28,8 34,8" fill="none" stroke="#c98a3f" stroke-width="1.6"/></svg>
+      10kΩ→GND
+    </span>
+  </div>
+  <div class="pinrow in">
+    <span class="origin">P17</span><span class="wire">──────┬───────▶</span><span class="pin">IN4</span>
+    <span class="res">
+      <svg width="34" height="16" viewBox="0 0 34 16"><polyline points="0,8 5,8 8,2 12,14 16,2 20,14 24,2 28,8 34,8" fill="none" stroke="#c98a3f" stroke-width="1.6"/></svg>
+      10kΩ→GND
+    </span>
+  </div>
+  <div class="pinrow en">
+    <span class="origin">P4</span><span class="wire">──────────────▶</span><span class="pin">ENB</span><span class="none">— sin resistencia —</span>
+  </div>
+  <div class="pinrow">
+    <span class="origin">Riel 5V lógico</span><span class="wire">──────────────▶</span><span class="pin" style="background:rgba(224,195,74,.15); color:var(--v5); border-color:rgba(224,195,74,.4);">5V</span><span class="none">alimenta la lógica interna</span>
+  </div>
+</div>
+</div>
+
+<div class="note">
+  <b>Dónde soldar/insertar físicamente</b>: lo más cerca posible del header de
+  control del L298N — idealmente las 4 resistencias montadas directo entre
+  cada pin IN y el pin GND más próximo del mismo módulo, no en el protoboard
+  del ESP32. Si el L298N no tiene un pin GND libre justo al lado del header de
+  IN1-4, cualquier GND del módulo sirve (todos son el mismo nodo) — pero
+  cuanto más corto el tramo entre la resistencia y el pin IN, más robusta la
+  protección ante un cable que se afloje a mitad de camino.
+</div>
+
+<h2>4. Salidas de potencia — L298N → motores</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>L298N</th><th>Motor</th><th>Nota</th></tr></thead>
+  <tbody>
+    <tr><td>OUT1 / OUT2</td><td>Motor 1 (derecho)</td><td>Sentido ya corregido físicamente (2026-08-05) intercambiando OUT1/OUT2</td></tr>
+    <tr><td>OUT3 / OUT4</td><td>Motor 2 (izquierdo)</td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="capnote" style="display:inline-block;">C2 — 100nF, terminales de potencia Motor 1</div>
+<div class="capnote" style="display:inline-block; margin-left:.4rem;">C3 — 100nF, terminales de potencia Motor 2</div>
+
+<h2>5. Todos los capacitores — resumen</h2>
+
+<div class="table-wrap">
+<table>
+  <caption>Consolidado — ver también CLAUDE.md, sección "Estado actual"</caption>
+  <thead><tr><th>ID</th><th>Valor</th><th>Ubicación</th><th>Estado</th></tr></thead>
+  <tbody>
+    <tr><td>C1</td><td>1000µF, ⚠️16V</td><td>Bornera VIN+/GND del L298N</td><td>Pendiente subir a 25V/35V</td></tr>
+    <tr><td>C2</td><td>100nF cerámico</td><td>Terminales de potencia, Motor 1</td><td>—</td></tr>
+    <tr><td>C3</td><td>100nF cerámico</td><td>Terminales de potencia, Motor 2</td><td>—</td></tr>
+    <tr><td>C4</td><td>1000µF, 25V</td><td>ESP32, pin 5V/GND (protoboard, fila 29↔21)</td><td>Reubicar acá desde donde iba el ESP8266</td></tr>
+    <tr><td>C5</td><td>1000µF</td><td>Terminales de salida del Buck (5V), antes de dividirse hacia L298N y ESP32</td><td>✅ Instalado 2026-08-05</td></tr>
+    <tr><td>C6</td><td>100nF cerámico</td><td>ESP32, riel 3V3 (protoboard, fila 20↔21)</td><td>—</td></tr>
+    <tr><td>C7</td><td>100nF cerámico</td><td>Riel 5V/GND del Nano</td><td>✅ Cerrado (2026-08-05) — sin función, el Nano no se usa</td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer>
+  Primera versión, 2026-08-05 — cierra el pendiente "crear plano-electrico.html"
+  de <code>CLAUDE.md</code>. Reúne decisiones ya cerradas; no introduce datos
+  nuevos de hardware. Para el detalle físico fila-por-fila del protoboard del
+  ESP32: <code>pinout-esp32.html</code> y <code>plano-protoboard-esp32.html</code>.
+  Ante cualquier discrepancia, la fuente de verdad sigue siendo
+  <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code>.
+</footer>
+
+</body>
+</html>

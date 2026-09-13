@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan de Cableado — Robot Balanceador</title>
+<meta name="description" content="Plan de armado en orden de ejecucion: verificaciones previas, senales de los drivers BTS7960, pull-downs, MPU6050, encoders y checklist final antes de energizar.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f6f7f9;
+    --acc:#1f5fa8; --acc-bg:#eaf1fb;
+    --warn:#8a6d00; --warn-bg:#fbf6dc;
+    --stop:#b3261e; --stop-bg:#fbeceb;
+    --ok:#1f7a3d; --ok-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:24px; font-size:15px; line-height:1.5;
+    max-width:1080px; margin-inline:auto;
+  }
+  h1{font-size:1.5rem; margin:0 0 4px; letter-spacing:-.01em;}
+  h2{font-size:1.05rem; margin:32px 0 10px; padding-bottom:5px; border-bottom:2px solid var(--rule);}
+  h2 .n{display:inline-block; width:26px; height:26px; line-height:26px; text-align:center;
+        background:var(--acc); color:#fff; border-radius:50%; font-size:.85rem; margin-right:8px;}
+  h3{font-size:.9rem; margin:18px 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em;}
+  .sub{color:var(--dim); font-size:.85rem; margin-bottom:16px;}
+  p{margin:8px 0;}
+  code{font-family:var(--mono); font-size:.9em; background:var(--panel); padding:1px 5px; border-radius:3px;}
+
+  .banner{background:var(--warn-bg); border:1px solid var(--warn); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin-bottom:14px;}
+  .stop{background:var(--stop-bg); border:1px solid var(--stop); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0; color:var(--stop);}
+  .note{background:var(--panel); border:1px solid var(--rule); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; color:var(--dim); margin:14px 0;}
+  .good{background:var(--ok-bg); border:1px solid var(--ok); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0;}
+  .banner b, .note b, .stop b, .good b{color:var(--ink);}
+
+  table{border-collapse:collapse; width:100%; font-size:.85rem; margin:10px 0;}
+  th,td{border:1px solid var(--rule); padding:6px 9px; text-align:left; vertical-align:top;}
+  th{background:var(--panel); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--dim);}
+  td code, th code{font-family:var(--mono); font-size:.85em;}
+
+  ul.chk{list-style:none; padding-left:2px; font-size:.9rem;}
+  ul.chk li{margin-bottom:8px; padding-left:26px; position:relative;}
+  ul.chk li::before{content:"☐"; position:absolute; left:0; top:-1px; font-size:1.1em; color:var(--dim);}
+  ul.chk li b{color:var(--ink);}
+  ul.chk li.done::before{content:"☑"; color:var(--ok);}
+  ul.chk li.done{color:var(--dim);}
+
+  .badge{display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.03em; padding:2px 8px; border-radius:10px; margin-left:6px; vertical-align:1px;}
+  .b-verif{background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn);}
+  .b-nuevo{background:var(--acc-bg); color:var(--acc); border:1px solid var(--acc);}
+  .b-hecho{background:var(--ok-bg); color:var(--ok); border:1px solid var(--ok);}
+
+  footer{color:var(--faint); font-size:.75rem; margin-top:36px; padding-top:10px; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:10mm; font-size:11px; max-width:none;}
+    .banner,.stop,.note,.good,th{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    h2{page-break-after:avoid;}
+    table{page-break-inside:avoid;}
+    @page{size:A4 portrait; margin:10mm;}
+  }
+</style>
+</head>
+<body>
+
+<h1>Plan de cableado — señales y verificación de potencia</h1>
+<div class="sub">Orden de ejecución para terminar el armado: drivers BTS7960, ESP32, MPU6050 y encoders.
+Detalle completo (tablas de referencia) en <code>docs/plano-potencia.html</code> y <code>docs/plano-senales.html</code>;
+este documento es la <b>secuencia</b> para ejecutarlo, cruzada con <code>docs/conexiones-registro-pruebas.md</code> §1–8.</div>
+
+<div class="banner">
+  ⚠️ <b>Potencia dada por armada, sin verificar hoy.</b> Este plan asume que §1–2 y los capacitores de §6
+  ya están cableados (coincide con el registro: C1/C4/C5/C9/C10/C11 instalados). Aun así, la
+  <b>Sección 0</b> repite las 3 verificaciones más baratas antes de tocar cualquier señal — es la lección
+  que ya costó tres sesiones enteras en este proyecto (7.6, GND ESP32↔driver, switch en OFF): <b>"el
+  firmware reporta todo bien y el motor no se mueve" es casi siempre potencia, nunca señal.</b>
+</div>
+
+<h2><span class="n">0</span>Antes de tocar cualquier cable de señal</h2>
+
+<p>Tres chequeos de 30 segundos cada uno, con el módulo <b>desconectado</b> los dos primeros. Ninguno
+está confirmado como hecho en el registro — hacerlos ahora evita rehacer trabajo después.</p>
+
+<ul class="chk">
+  <li class="done"><b>V1 — continuidad <code>B−</code> ↔ <code>GND</code> del header, en cada IBT-2</b>
+    <span class="badge b-hecho">hecho — 2026-09-10</span><br>
+    <b>Resultado: dan continuidad</b> en los dos módulos. Decisión: cablear <b>solo <code>B−</code></b> al
+    nodo estrella de potencia; <b>no</b> llevar el <code>GND</code> del header al riel lógico — la
+    referencia común ya la da la estrella. Confirmado además, por separado, que <code>GND</code>↔<code>VCC</code>
+    del header no da continuidad (el cerámico C10/C11 soldado ahí no puenteó nada). Sigue pendiente el
+    punto 4 de la Sección 4 (continuidad ESP32↔driver de punta a punta) antes de energizar.
+  </li>
+  <li class="done"><b>V2 — ¿el módulo trae pull-up interno en <code>EN</code>?</b> <span class="badge b-hecho">hecho, M1 y M2 — 2026-09-10</span><br>
+    <b>Resultado, en los dos módulos: no es un pull-up resistivo.</b> <code>R_EN</code> y <code>L_EN</code>
+    dan el mismo patrón asimétrico según polaridad — finito en un sentido (~1.6MΩ) y <code>OL</code>
+    (abierto) en el otro — típico de un diodo/clamp ESD hacia <code>VCC</code>, no de un resistor.
+    Simétrico entre pines y entre módulos, como debía ser por construcción (confirmado en M2 primero, M1
+    después). El transitorio inicial (una lectura rápida dio 29.9kΩ antes de asentarse en M2) es carga
+    del cerámico C10/C11 (VCC↔GND) a través de la resistencia interna del multímetro — no un dato en
+    conflicto.<br>
+    <b>Conclusión: la pull-down externa de 10kΩ es segura de instalar en los dos módulos</b>, sin riesgo
+    de divisor resistivo.
+  </li>
+  <li><b>V3 — potencia ya armada, confirmarla antes de avanzar</b> <span class="badge b-verif">interrumpida por incidente — retomar</span><br>
+    Con el sistema energizado: switch en ON, <code>B+</code> de <b>cada</b> IBT-2 mide ~12V contra GND de
+    potencia (son dos entradas, medir las dos), <code>VCC</code> de <b>cada</b> IBT-2 mide ~5V. Son los
+    puntos 1–3 del checklist de la Sección 4 — repetirlos ahora, antes de cablear señal, ahorra descartar
+    hipótesis de más tarde.
+    <div class="stop" style="margin-top:8px;">
+      ⛔ <b>Incidente 2026-09-10:</b> al intentar V3 (solo alimentación al nodo estrella, ESP32/MPU/encoders
+      todavía sin riel conectado) salió humo de la bornera <code>IN</code> del Buck — cableado invertido en
+      su entrada. Fusible no saltó. Diagnóstico: <code>B+</code>↔<code>B−</code> de cada IBT-2 sano (500kΩ/1MΩ,
+      fuga normal del bulk de 330µF, sin corto — drivers descartados de daño); <code>IN−</code>↔<code>OUT+</code>
+      del Buck viejo con continuidad — falla interna confirmada, módulo destruido. Detalle completo en
+      <code>docs/conexiones-registro-pruebas.md</code> 7.24.<br><br>
+      <b>Antes de repetir V3:</b> (1) verificar con multímetro la polaridad de los cables al Buck nuevo
+      antes de conectarlo — no confiar en el cableado tal como está armado; (2) reemplazar <code>C1</code> y
+      el capacitor de salida (1000µF/50V) con los repuestos en stock, ninguno mostraba daño visible pero
+      estuvieron en el camino directo de la falla; (3) probar el Buck nuevo <b>aislado</b> (sin drivers ni
+      ESP32) y confirmar ~5V en su salida; (4) recién ahí, repetir V3 completa.
+    </div>
+  </li>
+</ul>
+
+<h2><span class="n">1</span>Señales de los drivers — ESP32 → 2× BTS7960</h2>
+
+<p>Reusa los <b>mismos 6 GPIO y las mismas filas del protoboard</b> que manejaban el L298N — cambia solo a
+qué pin del módulo llega cada cable. Nada que recablear del lado del ESP32.</p>
+
+<table>
+<tr><th>GPIO</th><th>Fila protoboard</th><th>Destino IBT-2</th><th></th></tr>
+<tr><td><code>27</code></td><td>23 (I)</td><td>M1 — <code>R_EN</code> + <code>L_EN</code> atados</td><td></td></tr>
+<tr><td><code>14</code></td><td>22 (H)</td><td>M1 — <code>RPWM</code></td><td></td></tr>
+<tr><td><code>13</code></td><td>21 (G)</td><td>M1 — <code>LPWM</code></td><td></td></tr>
+<tr><td><code>4</code></td><td>27 (E)</td><td>M2 — <code>R_EN</code> + <code>L_EN</code> atados</td><td></td></tr>
+<tr><td><code>16</code></td><td>29 (C)</td><td>M2 — <code>RPWM</code></td><td></td></tr>
+<tr><td><code>17</code></td><td>28 (D)</td><td>M2 — <code>LPWM</code></td><td></td></tr>
+</table>
+
+<ul class="chk">
+  <li>Atar <code>R_EN</code>+<code>L_EN</code> de cada módulo a un solo cable antes de llevarlo al GPIO —
+    es la práctica que recomienda el fabricante, no hace falta habilitarlos por separado.</li>
+  <li><code>M+</code>/<code>M−</code> de cada IBT-2 → motor (rojo/blanco, ver Sección 3).</li>
+</ul>
+
+<div class="note">
+  <b>El sentido de giro se valida en banco, no se asume.</b> Con el L298N hizo falta invertir OUT1/OUT2 de
+  M1. Al recablear a <code>M+</code>/<code>M−</code> esa corrección se pierde — repetir la Fase 1 del Test
+  3 antes de subir el duty (Sección 5). M1 y M2 están montados en espejo: dan signo opuesto de encoder para
+  el mismo comando, es esperable.
+</div>
+
+<h2><span class="n">2</span>Pull-downs de seguridad — 6 en total</h2>
+
+<p>Con <code>EN</code> en bajo, <b>ambos</b> MOSFET del puente quedan apagados sin importar
+<code>RPWM</code>/<code>LPWM</code> (tabla de verdad del datasheet, 4.4.5) — es la única línea que garantiza
+motores parados si el ESP32 se cuelga.</p>
+
+<table>
+<tr><th>Cantidad</th><th>Valor</th><th>Dónde</th><th>Estado</th></tr>
+<tr><td>4×</td><td>10kΩ</td><td><code>RPWM</code>/<code>LPWM</code> (filas 21/22/28/29) → GND lógico</td><td><span class="badge b-hecho">ya instaladas</span> — conservar</td></tr>
+<tr><td>2×</td><td>10kΩ</td><td><code>EN</code> M1 y M2, soldadas directo en el header de cada IBT-2 (entre el punto donde <code>R_EN</code>+<code>L_EN</code> quedan atados y <code>GND</code> del mismo header)</td><td><span class="badge b-nuevo">falta instalar</span> — condicionado al resultado de <b>V2</b></td></tr>
+</table>
+
+<div class="stop">⛔ No instalar las 2 nuevas si V2 mostró pull-up interno sin antes decidir el valor correcto de la pull-down externa — un 10kΩ ciego podría armar un divisor que no baja del todo.</div>
+
+<h2><span class="n">3</span>MPU6050 (GY-521) — I2C</h2>
+
+<table>
+<tr><th>Señal</th><th>GPIO</th><th>Fila protoboard</th></tr>
+<tr><td>SDA</td><td><code>21</code></td><td>23 (C)</td></tr>
+<tr><td>SCL</td><td><code>22</code></td><td>24 (A)</td></tr>
+<tr><td>VCC</td><td>3V3</td><td>29 (G) — <b>compartida</b> con los dos encoders</td></tr>
+<tr><td>GND</td><td>GND lógico</td><td>—</td></tr>
+</table>
+
+<div class="note">Alimentar a <b>3.3V</b>, nunca 5V. Confirmar que esta zona del protoboard sigue armada igual después del rearmado del chasis — si se rehizo desde cero, no asumir que las filas 23/24/29 quedaron iguales.</div>
+
+<h2><span class="n">4</span>Encoders — 2 motores × 4 cables + VCC/GND compartidos</h2>
+
+<table>
+<tr><th>Color</th><th>Función</th><th>Destino</th></tr>
+<tr><td>Rojo</td><td>Motor power +</td><td>Comparte pestaña con el cable grueso de potencia del motor (M+ del driver)</td></tr>
+<tr><td>Blanco</td><td>Motor power −</td><td>Ídem, M− del driver</td></tr>
+<tr><td>Negro</td><td>Encoder GND</td><td>Riel GND lógico</td></tr>
+<tr><td>Azul</td><td>Encoder VCC</td><td>Riel 3V3 (mismo que MPU)</td></tr>
+<tr><td>Amarillo</td><td>Canal A</td><td>GPIO <code>32</code> (M1) / GPIO <code>25</code> (M2)</td></tr>
+<tr><td>Verde</td><td>Canal B</td><td>GPIO <code>33</code> (M1) / GPIO <code>26</code> (M2)</td></tr>
+</table>
+
+<div class="note">
+  Los pines de encoder están en GPIO full-featured (no en los de solo-entrada 34/35/SVP/SVN) a propósito —
+  no está confirmado si la salida es push-pull o colector abierto, y esos pines de solo-entrada no tienen
+  pull-up interno. No mover sin confirmar el tipo de salida primero.
+</div>
+
+<h2><span class="n">5</span>Checklist final antes de energizar con todo cableado</h2>
+
+<ul class="chk">
+  <li>Switch de V+ en <b>ON</b>.</li>
+  <li><code>B+</code> de <b>cada</b> módulo mide ~12V contra GND de potencia (dos entradas, medir las dos).</li>
+  <li><code>VCC</code> de <b>cada</b> módulo mide ~5V.</li>
+  <li>Continuidad entre un <code>GND</code> del ESP32 y el GND del driver (según lo que haya salido en V1).</li>
+  <li><b>Las 6 pull-downs instaladas</b> (4 viejas + 2 nuevas en <code>EN</code>).</li>
+  <li>Sentido de giro validado por encoder <b>antes</b> de subir el duty (Fase 1 del Test 3) — ver Sección 1.</li>
+</ul>
+
+<h2><span class="n">6</span>Primera prueba con motores — qué NO asumir todavía</h2>
+
+<ul class="chk">
+  <li><b>Cap de PWM = 121</b>, punto de partida (§8.5). Se calculó sin la caída de un BJT (el BTS7960 es
+    MOSFET) — acá el número sí es el límite real, no un cálculo conservador de más como pasaba con el L298N.</li>
+  <li>⚠️ <b>No asumir coast ni brake.</b> Hay una inferencia de datasheet de que <code>EN=1</code>,
+    <code>RPWM=PWM</code>, <code>LPWM=0</code> ya hace brake de fábrica (§8.7) — es lectura de datasheet, no
+    medición. Este proyecto ya se equivocó dos veces con ω₀ y dos con K_U por confiarle a una cadena de
+    razonamiento lo que solo cierra la balanza. No usarlo en ningún cálculo hasta medirlo (método del Test 9).</li>
+  <li>Todo el presupuesto de torque (<code>K_U</code>, <code>θ_umbral</code>) sigue sin validar con este
+    driver — ver <code>CLAUDE.md</code>, pendiente "Re-medir <code>K_U</code> con el BTS7960 cableado".</li>
+</ul>
+
+<footer>
+  Robot Balanceador — creado 2026-09-10. Consolida <code>docs/conexiones-registro-pruebas.md</code> §1–8 y
+  <code>CLAUDE.md</code> en un plan de ejecución. Las tablas de referencia completas (con notas de por qué
+  cada decisión) siguen viviendo en <code>plano-potencia.html</code> y <code>plano-senales.html</code>.
+</footer>
+
+</body>
+</html>

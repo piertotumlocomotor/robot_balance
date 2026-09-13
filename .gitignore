@@ -20,16 +20,24 @@ models/*.h5
 experiments/outputs/
 
 # --- Repo reordenado para compartir con el profesor (Algoritmos Evolutivos I) ---
-# Solo notebooks/ e informes/ se comparten por ahora. El resto del repo (robot
-# balanceador: firmware, docs, tests, experimentos) queda fuera de git
-# temporalmente -- sigue existiendo en el filesystem, solo no se trackea.
+# La entrega de la cursada fue el 2026-08-23 y ya pasó, asi que el "temporalmente"
+# de abajo cumplio su funcion. El 2026-09-13 se volvieron a trackear CLAUDE.md y
+# docs/ -- son la fuente de verdad del proyecto y estaban sin historial ni
+# respaldo. El resto sigue fuera por ahora.
 # notebooks/ e informes/ NO se ignoran (se listan explicitos mas abajo).
-CLAUDE.md
 algoritmos_evolutivos_pso/
-docs/
 experiments/
-firmware/
-test/
+
+# PDFs de terceros dentro de docs/: re-descargables, binarios y pesados (13M de
+# los 16M de docs/). El historial de git es permanente, asi que no conviene
+# meterlos -- siguen existiendo en el filesystem, solo no se versionan.
+# Para incluir alguno: borrar su linea de aca.
+docs/uba-mia-ae1-07.pdf
+docs/uba-mia-ae1-08.pdf
+docs/bts7960_datasheet.pdf
+# NOTA: docs/BTS7960.pdf (Infineon oficial, 464K) SI se trackea a proposito --
+# CLAUDE.md lo cita como la autoridad normativa de umbrales logicos y tabla de
+# verdad, y ante discrepancia le gana a la ficha del modulo.
 
 # Resto trackeado de la arquitectura ESP8266+Nano, abandonada (ver CLAUDE.md,
 # "Decisiones revertidas"). Sacado del tracking con git rm --cached

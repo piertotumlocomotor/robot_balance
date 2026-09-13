@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plantilla imprimible — Niveles N1-N4</title>
+<meta name="description" content="Plantillas a escala real 1:1 de los 4 niveles (76x150mm cada uno) para imprimir, recortar y pegar directo sobre las láminas de balsa ya cortadas.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f4f5f8;
+    --power:#8a6d00; --power-bg:#fbf6dc;
+    --danger:#b3261e; --danger-bg:#fbeceb;
+    --used:#1f7a3d; --used-bg:#e9f7ee;
+    --bridge:#6b3fa0; --bridge-bg:#f2ecfa;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:8mm; font-size:12px; line-height:1.35;
+  }
+  h1{font-size:.85rem; margin:0; white-space:nowrap;}
+  .titlebar{display:flex; align-items:center; justify-content:space-between; gap:6mm; margin-bottom:3mm;}
+  .calib-inline{display:flex; align-items:center; gap:2mm; font-family:var(--mono); font-size:.62rem; color:var(--dim);}
+  .calib-inline .calib{margin:0;}
+
+  .page{page-break-after:always;}
+  .page:last-child{page-break-after:auto;}
+  .stages-row{display:flex; gap:8mm; align-items:flex-start; flex-wrap:wrap;}
+  .stage-block{display:flex; flex-direction:column; align-items:center; gap:1.5mm;}
+  .stage-title{font-family:var(--mono); font-size:.7rem; font-weight:700; color:var(--ink);}
+  .stage-sub{font-family:var(--mono); font-size:.6rem; color:var(--dim); text-align:center; max-width:76mm;}
+
+  /* ---- Zona de escala real: 76x150mm físicos exactos ---- */
+  .stage{
+    position:relative; width:76mm; height:150mm;
+    border:0.4mm solid var(--ink); background:#fff; flex-shrink:0;
+  }
+  .stage .patch{
+    position:absolute; width:14mm; height:14mm;
+    border:0.35mm dashed var(--power); box-sizing:border-box;
+  }
+  .stage .hole{
+    position:absolute; width:5.3mm; height:5.3mm; border-radius:50%;
+    border:0.35mm solid var(--ink); box-sizing:border-box;
+  }
+  .stage .hole::before, .stage .hole::after{ content:""; position:absolute; background:var(--ink); }
+  .stage .hole::before{ left:2.55mm; top:0mm; width:0.2mm; height:5.3mm; }
+  .stage .hole::after{ left:0mm; top:2.55mm; width:5.3mm; height:0.2mm; }
+
+  .stage .mhole{
+    position:absolute; width:4mm; height:4mm; border-radius:50%;
+    border:0.35mm solid var(--used); box-sizing:border-box;
+  }
+  .stage .mhole::before, .stage .mhole::after{ content:""; position:absolute; background:var(--used); }
+  .stage .mhole::before{ left:1.9mm; top:0mm; width:0.2mm; height:4mm; }
+  .stage .mhole::after{ left:0mm; top:1.9mm; width:4mm; height:0.2mm; }
+
+  .stage .flange{
+    position:absolute; border:0.35mm solid var(--used); box-sizing:border-box;
+    background:var(--used-bg); display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .stage .flange span{font-family:var(--mono); font-size:5px; color:var(--dim); line-height:1.35;}
+  .stage .place{
+    position:absolute; border:0.3mm dashed var(--bridge); box-sizing:border-box;
+    background:var(--bridge-bg); display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .stage .place span{font-family:var(--mono); font-size:5px; color:var(--bridge); line-height:1.35;}
+  .stage .tab{
+    position:absolute; border:0.3mm dashed var(--power); box-sizing:border-box;
+    background:var(--power-bg); display:flex; align-items:center; justify-content:center;
+  }
+  .stage .tab span{font-family:var(--mono); font-size:4.6px; color:var(--power);}
+  .stage label{position:absolute; font-family:var(--mono); color:var(--dim); font-size:5px;}
+  .stage label.danger{color:var(--danger);}
+  /* ---- fin zona de escala real ---- */
+
+  .calib{
+    width:50mm; height:0; border-top:0.4mm solid var(--ink); position:relative; margin:4mm 0 2mm;
+  }
+  .calib::before, .calib::after{
+    content:""; position:absolute; top:-2mm; width:0.3mm; height:4mm; background:var(--ink);
+  }
+  .calib::before{left:0;} .calib::after{right:0;}
+  .calib-label{font-family:var(--mono); font-size:.66rem; color:var(--ink); margin-bottom:2mm;}
+
+  .legend{font-size:.64rem; color:var(--dim); display:flex; flex-direction:column; gap:1mm; margin-top:3mm; max-width:160mm;}
+  .legend b{color:var(--ink);}
+
+  footer{color:var(--faint); font-size:.6rem; margin-top:4mm; padding-top:2mm; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:5mm;}
+    .warn, .note{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .stage *{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    @page{ size:A4 landscape; margin:5mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="titlebar">
+    <h1>Niveles N1-N4 — escala real 1:1</h1>
+    <div class="calib-inline"><div class="calib"></div><span>50mm — verificar con regla</span></div>
+  </div>
+
+  <div class="stages-row">
+    <div class="stage-block">
+      <div class="stage-title">NIVEL 1 — sobre el eje</div>
+      <div class="stage" role="img" aria-label="Plantilla del nivel 1: motor A anclado al borde superior, motor B al borde inferior, MPU6050 sobre su protoboard centrado entre ambos, con los 4 agujeros de varilla en las esquinas">
+        <div class="patch" style="left:2mm; top:2mm;"></div>
+        <div class="patch" style="left:60mm; top:2mm;"></div>
+        <div class="patch" style="left:2mm; top:134mm;"></div>
+        <div class="patch" style="left:60mm; top:134mm;"></div>
+        <div class="hole" style="left:6.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:6.35mm; top:138.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:138.35mm;"></div>
+
+        <div class="flange" style="left:18mm; top:0mm; width:40mm; height:40mm;"><span>MOTOR A<br>brida 40×40<br>al ras del borde<br>24.5mm ‖ eje · 30.4mm ⊥ eje</span></div>
+        <div class="mhole" style="left:20.8mm; top:5.75mm;"></div>
+        <div class="mhole" style="left:51.2mm; top:5.75mm;"></div>
+        <div class="mhole" style="left:20.8mm; top:30.25mm;"></div>
+        <div class="mhole" style="left:51.2mm; top:30.25mm;"></div>
+
+        <div class="place" style="left:15mm; top:57.5mm; width:46mm; height:35mm;"><span>MPU6050<br>protoboard 35×46<br>cinta doble faz</span></div>
+
+        <div class="flange" style="left:18mm; top:110mm; width:40mm; height:40mm;"><span>MOTOR B<br>brida 40×40<br>al ras del borde</span></div>
+        <div class="mhole" style="left:20.8mm; top:115.75mm;"></div>
+        <div class="mhole" style="left:51.2mm; top:115.75mm;"></div>
+        <div class="mhole" style="left:20.8mm; top:140.25mm;"></div>
+        <div class="mhole" style="left:51.2mm; top:140.25mm;"></div>
+      </div>
+      <div class="stage-sub">Motores cara inferior · MPU cara superior</div>
+    </div>
+
+    <div class="stage-block">
+      <div class="stage-title">NIVEL 2 — batería + buck + switch</div>
+      <div class="stage" role="img" aria-label="Plantilla del nivel 2: batería, buck y switch girados 90 grados, apilados en línea con margen de sobra, agujeros de varilla en las esquinas, nota de que el fusible va en la cara inferior a criterio del usuario">
+        <div class="patch" style="left:2mm; top:2mm;"></div>
+        <div class="patch" style="left:60mm; top:2mm;"></div>
+        <div class="patch" style="left:2mm; top:134mm;"></div>
+        <div class="patch" style="left:60mm; top:134mm;"></div>
+        <div class="hole" style="left:6.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:6.35mm; top:138.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:138.35mm;"></div>
+
+        <div class="place" style="left:2mm; top:10mm; width:72mm; height:35mm;"><span>BATERÍA 3S · 72×35<br>72 transversal</span></div>
+        <div class="place" style="left:6mm; top:55mm; width:64mm; height:47mm;"><span>XL4016 · 64×47</span></div>
+        <div class="place" style="left:15.25mm; top:112mm; width:45.5mm; height:28.6mm;"><span>SWITCH · 45.5×28.6</span></div>
+        <label class="danger" style="left:20mm; top:144mm;">fusible → cara inferior</label>
+      </div>
+      <div class="stage-sub">Batería/buck/switch girados 90° · cara superior</div>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="titlebar">
+    <h1>Niveles N1-N4 — escala real 1:1</h1>
+    <div class="calib-inline"><div class="calib"></div><span>50mm — verificar con regla</span></div>
+  </div>
+
+  <div class="stages-row">
+    <div class="stage-block">
+      <div class="stage-title">NIVEL 3 — drivers de motor</div>
+      <div class="stage" role="img" aria-label="Plantilla del nivel 3: dos BTS7960 escalonados, montados directo arriba, con 18 milímetros de aire entre ambos, agujeros de varilla en las esquinas">
+        <div class="patch" style="left:2mm; top:2mm;"></div>
+        <div class="patch" style="left:60mm; top:2mm;"></div>
+        <div class="patch" style="left:2mm; top:134mm;"></div>
+        <div class="patch" style="left:60mm; top:134mm;"></div>
+        <div class="hole" style="left:6.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:6.35mm; top:138.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:138.35mm;"></div>
+
+        <div class="place" style="left:13mm; top:16mm; width:50mm; height:50mm;"><span>BTS7960 · M1<br>50×50 · disipador ↑</span></div>
+        <div class="place" style="left:13mm; top:84mm; width:50mm; height:50mm;"><span>BTS7960 · M2<br>50×50 · disipador ↑</span></div>
+        <label style="left:66.5mm; top:70mm;">18mm</label>
+      </div>
+      <div class="stage-sub">Montados directo arriba — sin recorte, sin compartir cara</div>
+    </div>
+
+    <div class="stage-block">
+      <div class="stage-title">NIVEL 4 — ESP32 + protoboard</div>
+      <div class="stage" role="img" aria-label="Plantilla del nivel 4: protoboard del ESP32 girada 90 grados, centrada con margen amplio, agujeros de varilla en las esquinas, pestaña de salida para el USB-C">
+        <div class="patch" style="left:2mm; top:2mm;"></div>
+        <div class="patch" style="left:60mm; top:2mm;"></div>
+        <div class="patch" style="left:2mm; top:134mm;"></div>
+        <div class="patch" style="left:60mm; top:134mm;"></div>
+        <div class="hole" style="left:6.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:6.35mm; top:138.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:138.35mm;"></div>
+
+        <div class="tab" style="left:28mm; top:20mm; width:20mm; height:10mm;"><span>USB-C ↑</span></div>
+        <div class="place" style="left:10mm; top:33mm; width:56mm; height:84mm;"><span>PROTOBOARD + ESP32<br>84×56 girada</span></div>
+      </div>
+      <div class="stage-sub">Margen amplio a ambos lados (33mm)</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

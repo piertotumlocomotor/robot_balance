@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ensayo m·l — Robot Balanceador</title>
+<meta name="description" content="Esquema y protocolo del ensayo de dos apoyos para medir m y m·l del chasis rearmado, planilla de registro y calculo de J combinado con w0.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f6f7f9;
+    --acc:#1f5fa8; --acc-bg:#eaf1fb;
+    --warn:#8a6d00; --warn-bg:#fbf6dc;
+    --stop:#b3261e; --stop-bg:#fbeceb;
+    --ok:#1f7a3d; --ok-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:24px; font-size:15px; line-height:1.5;
+    max-width:1080px; margin-inline:auto;
+  }
+  h1{font-size:1.5rem; margin:0 0 4px; letter-spacing:-.01em;}
+  h2{font-size:1.05rem; margin:30px 0 10px; padding-bottom:5px; border-bottom:2px solid var(--rule);}
+  h3{font-size:.9rem; margin:18px 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em;}
+  .sub{color:var(--dim); font-size:.85rem; margin-bottom:16px;}
+  p{margin:8px 0;}
+  code{font-family:var(--mono); font-size:.9em; background:var(--panel); padding:1px 5px; border-radius:3px;}
+
+  .banner{
+    background:var(--warn-bg); border:1px solid var(--warn); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; margin-bottom:18px;
+  }
+  .stop{
+    background:var(--stop-bg); border:1px solid var(--stop); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0; color:var(--stop);
+  }
+  .note{
+    background:var(--panel); border:1px solid var(--rule); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; color:var(--dim); margin:14px 0;
+  }
+  .good{
+    background:var(--ok-bg); border:1px solid var(--ok); border-left-width:4px;
+    border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0;
+  }
+  .banner b, .note b, .stop b, .good b{color:var(--ink);}
+
+  .figwrap{overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:#fff; padding:8px;}
+  svg{display:block; min-width:900px;}
+
+  table{border-collapse:collapse; width:100%; font-size:.85rem; margin:10px 0;}
+  th,td{border:1px solid var(--rule); padding:6px 9px; text-align:left; vertical-align:top;}
+  th{background:var(--panel); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--dim);}
+  td code, th code{font-family:var(--mono); font-size:.85em;}
+  td.fill{background:#fffef0; min-width:90px;}
+
+  ol.steps{padding-left:22px; font-size:.9rem;}
+  ol.steps li{margin-bottom:9px;}
+  ol.steps b{color:var(--acc);}
+
+  .formula{
+    font-family:var(--mono); background:var(--panel); border:1px solid var(--rule);
+    border-radius:5px; padding:10px 14px; font-size:.92rem; margin:10px 0; white-space:pre;
+  }
+
+  footer{color:var(--faint); font-size:.75rem; margin-top:34px; padding-top:10px; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:10mm; font-size:11px; max-width:none;}
+    .banner,.stop,.note,.good,th,td.fill{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    svg{min-width:0; width:100%;}
+    .figwrap{overflow:visible;}
+    h2{page-break-after:avoid;}
+    table{page-break-inside:avoid;}
+    @page{size:A4 portrait; margin:10mm;}
+  }
+</style>
+</head>
+<body>
+
+<h1>Ensayo m·l — dos apoyos (chasis rearmado)</h1>
+<div class="sub">Mide <code>m</code> y <code>m·l</code> del chasis de balsa actual, para cerrar <code>J = m·g·l/ω₀²</code>
+junto con <code>ω₀ = 8.0 rad/s</code> (medido 2026-09-09/10). Ver <code>docs/conexiones-registro-pruebas.md</code> §7.17 (método original,
+chasis viejo) y §7.22 (ω₀ vigente).</div>
+
+<div class="banner">
+  ⚠️ <b>El <code>m·l = 0.1265 kg·m</code> que está en el registro es del chasis VIEJO</b> (contrachapado,
+  26 cm, medido 2026-08-16) — no sirve para esta cuenta. Esta es la re-medición sobre el chasis rearmado.
+  Confirmado: el ensamble es el mismo que colgaba en los videos de ω₀, sin cambios físicos desde entonces.
+</div>
+
+<h2>1. Esquema del armado</h2>
+
+<div class="figwrap">
+<svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="El mismo acople (bracket con bulon flojo) que colgaba el robot para medir w0 ahora esta atornillado cerca del borde de la mesa. El eje de las ruedas queda como pivote libre. El cuerpo del robot, con sus niveles N1 a N4, cae en diagonal desde ese pivote hasta que su extremo lejano apoya sobre el plato de una balanza ubicada mas abajo. Una cota horizontal D mide la distancia entre la proyeccion del pivote y el punto de contacto sobre el plato.">
+
+  <!-- mesa -->
+  <rect x="520" y="70" width="260" height="14" fill="#e2e5ea" stroke="#8a93a3"/>
+  <text x="650" y="62" text-anchor="middle" font-size="13" fill="#4b5563" font-family="-apple-system,sans-serif">mesa</text>
+  <g stroke="#8a93a3" stroke-width="1">
+    <line x1="535" y1="84" x2="520" y2="100"/>
+    <line x1="565" y1="84" x2="550" y2="100"/>
+    <line x1="595" y1="84" x2="580" y2="100"/>
+    <line x1="625" y1="84" x2="610" y2="100"/>
+    <line x1="655" y1="84" x2="640" y2="100"/>
+  </g>
+
+  <!-- bracket -->
+  <rect x="588" y="84" width="26" height="55" fill="#eef0f3" stroke="#4b5563" stroke-width="1.5"/>
+  <text x="660" y="105" font-size="12.5" fill="#181c24" font-family="-apple-system,sans-serif">bracket atornillado</text>
+  <text x="660" y="121" font-size="12.5" fill="#181c24" font-family="-apple-system,sans-serif">(mismo acople de ayer,</text>
+  <text x="660" y="137" font-size="12.5" fill="#181c24" font-family="-apple-system,sans-serif">el que colgaba el robot)</text>
+  <line x1="614" y1="108" x2="655" y2="102" stroke="#8a93a3" stroke-width="1"/>
+
+  <!-- pivote (bulon flojo) -->
+  <circle cx="601" cy="150" r="9" fill="#fbf6dc" stroke="#8a6d00" stroke-width="2"/>
+  <line x1="608" y1="156" x2="636" y2="178" stroke="#8a93a3" stroke-width="1"/>
+  <text x="640" y="184" font-size="12.5" fill="#8a6d00" font-family="-apple-system,sans-serif">bulón flojo =</text>
+  <text x="640" y="199" font-size="12.5" fill="#8a6d00" font-family="-apple-system,sans-serif">PIVOTE LIBRE</text>
+  <text x="640" y="214" font-size="11.5" fill="#4b5563" font-family="-apple-system,sans-serif">(eje de las ruedas)</text>
+
+  <!-- cuerpo del robot: N1..N4 en diagonal -->
+  <g stroke="#181c24" stroke-width="2" fill="none">
+    <line x1="601" y1="150" x2="270" y2="330"/>
+  </g>
+  <!-- niveles como rectangulos rotados a lo largo de la diagonal -->
+  <g font-family="-apple-system,sans-serif" font-size="11" fill="#181c24" text-anchor="middle">
+    <g transform="translate(546,181) rotate(30)">
+      <rect x="-24" y="-9" width="48" height="18" fill="#eaf1fb" stroke="#1f5fa8"/>
+      <text y="4">N1</text>
+    </g>
+    <g transform="translate(456,232) rotate(30)">
+      <rect x="-24" y="-9" width="48" height="18" fill="#eaf1fb" stroke="#1f5fa8"/>
+      <text y="4">N2</text>
+    </g>
+    <g transform="translate(366,283) rotate(30)">
+      <rect x="-24" y="-9" width="48" height="18" fill="#eaf1fb" stroke="#1f5fa8"/>
+      <text y="4">N3</text>
+    </g>
+    <g transform="translate(300,318) rotate(30)">
+      <rect x="-24" y="-9" width="48" height="18" fill="#eaf1fb" stroke="#1f5fa8"/>
+      <text y="4">N4</text>
+    </g>
+  </g>
+  <text x="470" y="160" font-size="12.5" fill="#4b5563" font-family="-apple-system,sans-serif">cuerpo del robot, inclinado</text>
+
+  <!-- punto de contacto -->
+  <circle cx="270" cy="330" r="5" fill="#b3261e"/>
+  <text x="196" y="325" font-size="12" fill="#b3261e" font-family="-apple-system,sans-serif" text-anchor="middle">punto de</text>
+  <text x="196" y="340" font-size="12" fill="#b3261e" font-family="-apple-system,sans-serif" text-anchor="middle">contacto</text>
+
+  <!-- linea al plato -->
+  <line x1="270" y1="330" x2="270" y2="368" stroke="#181c24" stroke-width="2"/>
+
+  <!-- balanza -->
+  <rect x="220" y="368" width="100" height="10" fill="#eef0f3" stroke="#4b5563" stroke-width="1.5"/>
+  <rect x="200" y="378" width="140" height="34" fill="#f6f7f9" stroke="#4b5563" stroke-width="1.5"/>
+  <text x="270" y="399" text-anchor="middle" font-size="13" fill="#181c24" font-family="-apple-system,sans-serif">balanza</text>
+  <text x="270" y="360" text-anchor="middle" font-size="12" fill="#4b5563" font-family="-apple-system,sans-serif">lectura = w</text>
+
+  <!-- cota D -->
+  <line x1="601" y1="150" x2="601" y2="445" stroke="#c7ccd6" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="270" y1="330" x2="270" y2="445" stroke="#c7ccd6" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="270" y1="440" x2="601" y2="440" stroke="#1f5fa8" stroke-width="1.5" marker-start="url(#dim)" marker-end="url(#dim)"/>
+  <text x="435" y="462" text-anchor="middle" font-size="13" fill="#1f5fa8" font-family="-apple-system,sans-serif" font-weight="600">D (horizontal)</text>
+  <text x="435" y="477" text-anchor="middle" font-size="11" fill="#4b5563" font-family="-apple-system,sans-serif">pivote → punto de contacto</text>
+
+  <defs>
+    <marker id="dim" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#1f5fa8"/>
+    </marker>
+  </defs>
+</svg>
+</div>
+
+<div class="note">
+  <b>Por qué está en diagonal, no horizontal:</b> el pivote queda más alto que el punto de apoyo en
+  la balanza porque es el mismo bracket que ayer colgaba el robot en el aire — ahora fijo más abajo
+  (borde de mesa en vez de viga), así que el extremo lejano cae y llega a tocar la balanza apoyada en
+  una superficie más baja. No hace falta forzar el robot a quedar horizontal: <code>D</code> se mide
+  como proyección horizontal, no a lo largo del cuerpo.
+</div>
+
+<h2>2. Resumen del protocolo</h2>
+
+<ol class="steps">
+  <li><b>Medir <code>m</code> directo.</b> Robot completo apoyado sobre la balanza, nada más tocándolo.</li>
+  <li><b>Armar el banco</b> como en el esquema: el mismo bracket/bulón flojo del ensayo de ω₀, ahora
+      fijo cerca del borde de la mesa, con el eje de las ruedas como pivote y el extremo lejano
+      apoyado sobre el plato de la balanza.</li>
+  <li><b>Verificar que el pivote es libre.</b> Levantar el extremo que toca la balanza y soltarlo —
+      tiene que caer y asentarse solo, sin ayuda. Si no vuelve solo, el bulón está apretando y la
+      medición sale mal (lectura de menos, <code>l</code> falsamente grande).</li>
+  <li><b>Medir <code>D</code></b>: horizontal, desde el pivote hasta el punto de contacto real
+      sobre el plato — no hasta la punta física del robot. Los dos contactos (pivote y plato) tienen
+      que ser líneas o puntos, no superficies anchas, o <code>D</code> queda indefinido.</li>
+  <li><b>Leer la balanza</b> con el robot apoyado así.</li>
+  <li><b>Repetir 3 veces</b>, desarmando y volviendo a armar el banco entre cada toma — no solo
+      releer sin tocar nada. Detecta si el montaje cede o cambia según cómo se lo arma.</li>
+</ol>
+
+<div class="formula">m·l = lectura × D          l = m·l / m</div>
+
+<h2>3. Planilla de registro</h2>
+
+<table>
+  <tr><th>Cantidad</th><th>Valor</th><th>Notas</th></tr>
+  <tr><td><code>m</code> (robot completo)</td><td class="fill"></td><td>balanza directa</td></tr>
+  <tr><td>Lectura apoyo lejano — toma 1</td><td class="fill"></td><td></td></tr>
+  <tr><td>Lectura apoyo lejano — toma 2</td><td class="fill"></td><td>banco rearmado</td></tr>
+  <tr><td>Lectura apoyo lejano — toma 3</td><td class="fill"></td><td>banco rearmado</td></tr>
+  <tr><td><code>D</code></td><td class="fill"></td><td>horizontal, pivote → contacto</td></tr>
+</table>
+
+<div class="stop">
+  ⛔ <b>Chequeo antes de aceptar cualquier toma:</b> ¿el extremo volvió a apoyarse solo al soltarlo?
+  Si no, esa toma no vale — no promediarla con las demás.
+</div>
+
+<h2>4. Con estos datos, el cálculo que cierra</h2>
+
+<div class="formula">l = m·l / m
+J = m·g·l / ω₀²          (ω₀ = 8.0 rad/s, ver §7.22)
+radio de giro = √(J/m)   — comparar contra 0.577×L de una barra uniforme (L=22cm → ≈12.7cm)</div>
+
+<div class="good">
+  ✅ Si el radio de giro medido se aleja del ideal de barra uniforme, no es un error — es información:
+  en el chasis viejo dio 8.4cm contra 7.5cm ideal, y se explicó por los motores concentrados en un
+  extremo (sobre el eje, no aportan) y el resto de la masa repartida con brazo mayor. Interpretar así,
+  no descartar la medición.
+</div>
+
+<footer>
+  Robot Balanceador — creado 2026-09-10. Complementa <code>docs/conexiones-registro-pruebas.md</code> §7.17
+  (método original) y §7.22 (ω₀ vigente). Una vez con los 3 valores, pasarlos de vuelta para calcular
+  <code>l</code>, <code>J</code> y actualizar <code>θ_umbral</code>.
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plantilla imprimible — Soporte de motor</title>
+<meta name="description" content="Plantilla a escala real 1:1 de los dos soportes de montaje del motor (brida 40x40mm), A y B juntos en una sola hoja, para los dos extremos del Nivel 1.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f4f5f8;
+    --power:#8a6d00; --power-bg:#fbf6dc;
+    --danger:#b3261e; --danger-bg:#fbeceb;
+    --used:#1f7a3d; --used-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:10mm; font-size:12px; line-height:1.35;
+  }
+  h1{font-size:1.05rem; margin:0 0 2mm;}
+  .sub{color:var(--dim); font-size:.72rem; margin-bottom:3mm;}
+
+  .warn{
+    background:var(--danger-bg); border:1px solid var(--danger); border-radius:4px;
+    padding:2mm 3mm; font-size:.74rem; color:var(--danger); margin-bottom:4mm; font-weight:600;
+  }
+  .note{
+    background:var(--panel); border:1px solid var(--rule); border-radius:4px;
+    padding:2mm 3mm; font-size:.68rem; color:var(--dim); margin-bottom:4mm;
+  }
+  .rec{
+    background:var(--power-bg); border:1px solid var(--power); border-radius:4px;
+    padding:2mm 3mm; font-size:.68rem; color:var(--power); margin-bottom:4mm;
+  }
+  .rec b{color:var(--ink);}
+
+  .layout{display:flex; flex-direction:column; gap:6mm;}
+  .stages-row{display:flex; gap:10mm; align-items:flex-start;}
+  .stage-block{display:flex; flex-direction:column; align-items:center; gap:1.5mm;}
+  .stage-title{font-family:var(--mono); font-size:.68rem; font-weight:700; color:var(--ink);}
+
+  /* ---- Zona de escala real: TODO acá adentro está en mm físicos exactos ---- */
+  .stage{
+    position:relative; width:76mm; height:65mm;
+    border:0.4mm solid var(--ink); background:#fff; flex-shrink:0;
+  }
+  .stage .patch{
+    position:absolute; width:14mm; height:14mm;
+    border:0.35mm dashed var(--power); box-sizing:border-box;
+  }
+  .stage .hole{
+    position:absolute; width:5.3mm; height:5.3mm; border-radius:50%;
+    border:0.35mm solid var(--ink); box-sizing:border-box;
+  }
+  .stage .hole::before, .stage .hole::after{
+    content:""; position:absolute; background:var(--ink);
+  }
+  .stage .hole::before{ left:2.55mm; top:0mm; width:0.2mm; height:5.3mm; }
+  .stage .hole::after{ left:0mm; top:2.55mm; width:5.3mm; height:0.2mm; }
+
+  .stage .mhole{
+    position:absolute; width:4mm; height:4mm; border-radius:50%;
+    border:0.35mm solid var(--used); box-sizing:border-box;
+  }
+  .stage .mhole::before, .stage .mhole::after{
+    content:""; position:absolute; background:var(--used);
+  }
+  .stage .mhole::before{ left:1.9mm; top:0mm; width:0.2mm; height:4mm; }
+  .stage .mhole::after{ left:0mm; top:1.9mm; width:4mm; height:0.2mm; }
+
+  .stage .flange{
+    position:absolute; width:40mm; height:40mm; left:18mm; top:25mm;
+    border:0.3mm dashed var(--used); box-sizing:border-box;
+  }
+  .stage .innerline{
+    position:absolute; left:0; top:16mm; width:76mm; height:0;
+    border-top:0.2mm dotted var(--faint);
+  }
+  .stage .clearzone{
+    position:absolute; left:0; top:16mm; width:76mm; height:9mm;
+    background:repeating-linear-gradient(45deg, var(--panel), var(--panel) 3px, #fff 3px, #fff 6px);
+  }
+  .stage .shaftgap{
+    position:absolute; left:28mm; top:50mm; width:20mm; height:15mm;
+    border:0.3mm dashed var(--danger); box-sizing:border-box;
+    background:var(--danger-bg); opacity:.5;
+  }
+  .stage label{position:absolute; font-family:var(--mono); color:var(--dim);}
+  /* ---- fin zona de escala real ---- */
+
+  .side{width:75mm;}
+  .calib{
+    width:50mm; height:0; border-top:0.4mm solid var(--ink); position:relative; margin:6mm 0 2mm;
+  }
+  .calib::before, .calib::after{
+    content:""; position:absolute; top:-2mm; width:0.3mm; height:4mm; background:var(--ink);
+  }
+  .calib::before{left:0;}
+  .calib::after{right:0;}
+  .calib-label{font-family:var(--mono); font-size:.68rem; color:var(--ink); margin-bottom:5mm;}
+
+  .legend{font-size:.68rem; color:var(--dim); display:flex; flex-direction:column; gap:1.5mm;}
+  .legend b{color:var(--ink);}
+
+  footer{color:var(--faint); font-size:.62rem; margin-top:6mm; padding-top:2mm; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:8mm;}
+    .warn, .note, .rec{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .stage .patch, .stage .hole, .stage .mhole, .stage .flange, .stage .shaftgap, .stage .clearzone{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    @page{ size:A4 portrait; margin:10mm; }
+  }
+</style>
+</head>
+<body>
+<div style="background:#fbeceb;border:3px solid #b3261e;border-radius:6px;padding:14px 18px;margin:0 0 22px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#181c24;line-height:1.5">
+  <div style="font-size:1.05rem;font-weight:800;color:#b3261e;margin-bottom:6px">&#9940; DOCUMENTO DEPRECADO &mdash; PLANTA VIEJA</div>
+  <p style="margin:6px 0;font-size:.9rem">
+    Describe el robot <b>anterior al rearmado</b>: la pieza de <b>soporte de motor de 76&times;65mm</b>, que dej&oacute; de existir el 2026-08-28 &mdash; el motor se ancla directo a N1. Ese robot <b>ya no existe</b>.
+  </p>
+  <p style="margin:6px 0;font-size:.9rem">
+    <b>No usar para cablear, construir ni calcular.</b> Se conserva solo para repasar errores
+    y decisiones de esa etapa.
+  </p>
+  <p style="margin:6px 0 0;font-size:.85rem;color:#4b5563">
+    Documentaci&oacute;n vigente: <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code>
+    (filas del protoboard en <b>&sect;3.1b</b>). Planos vigentes: <code>docs/plano-potencia.html</code>,
+    <code>docs/plano-senales.html</code>, <code>docs/plano-distribucion-niveles.html</code>,
+    <code>docs/plantilla-imprimible-niveles.html</code>.
+  </p>
+</div>
+
+
+<h1>Plantilla imprimible — Soportes de motor</h1>
+<div class="sub">Escala real 1:1 · pieza de 76×65mm · las 2 copias (A y B) ya están en esta misma hoja — no hace falta imprimir dos veces</div>
+
+<div class="warn">
+  IMPRIMIR A ESCALA 100% ("Tamaño real") — NO "Ajustar a la página". Verificar la línea de calibración de 50mm con
+  una regla antes de usar esta hoja para marcar el material.
+</div>
+
+<div class="rec">
+  <b>Recomendación:</b> esta pieza está prácticamente sobre el eje de la rueda (brazo ≈0) — usar acá el contrachapado
+  del chasis viejo (más resistente, ya lo tenés) en vez de balsa no cuesta nada en m·l y da mucho mejor agarre para
+  los tornillos del motor, que cargan todo el torque de reacción.
+</div>
+
+<div class="note">
+  Ajustado 2026-08-28: la pieza pasó de 50mm a <b>65mm</b> de profundidad. El motor completo mide 51.6mm
+  (reductora+motor+encoder, medido) — con solo 50mm, el cuerpo del motor llegaba casi hasta el borde que se une a
+  N1, chocando con las borneras del driver que están justo del otro lado de esa unión. Los 15mm extra (zona rayada)
+  dan colchón para el cuerpo del motor y su cableado sin invadir N1, que no se toca — su distribución interna
+  sigue cerrando exacto en 150mm.
+</div>
+
+<div class="note">
+  Geometría del motor sin confirmar del todo: se sabe la brida (40×40mm, 4 agujeros Ø4mm, espaciado 24.5×30.4mm
+  centro a centro) pero no exactamente cuánto sobresale el eje más allá de la brida, ni dónde cae la brida a lo
+  largo del cuerpo de 51.6mm — los 65mm asumen el peor caso (brida pegada al eje). La zona roja punteada es una
+  <b>abertura generosa a propósito</b> — apoyá el motor real sobre la plantilla impresa y ajustá tamaño/posición
+  exacta antes de cortarla en la pieza definitiva.
+</div>
+
+<div class="layout">
+  <div class="stages-row">
+    <div class="stage-block">
+      <div class="stage-title">SOPORTE A</div>
+      <div class="stage" role="img" aria-label="Soporte de motor A: pieza de 76 por 65 milímetros, con 2 agujeros de varilla del lado que se une a N1, y la brida del motor de 40 por 40 milímetros con sus 4 tornillos del lado del eje">
+        <div class="patch" style="left:2mm; top:2mm;"></div>
+        <div class="patch" style="left:60mm; top:2mm;"></div>
+        <div class="hole" style="left:6.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:6.35mm;"></div>
+
+        <div class="clearzone"></div>
+        <div class="innerline"></div>
+        <label style="left:2mm; top:17mm; font-size:5px;">borde que se une a N1</label>
+        <label style="left:2mm; top:20.5mm; font-size:4.6px; color:var(--faint);">+15mm colchón para el motor</label>
+
+        <div class="flange"></div>
+        <div class="mhole" style="left:23.75mm; top:27.8mm;"></div>
+        <div class="mhole" style="left:50.25mm; top:27.8mm;"></div>
+        <div class="mhole" style="left:23.75mm; top:58.2mm;"></div>
+        <div class="mhole" style="left:50.25mm; top:58.2mm;"></div>
+
+        <div class="shaftgap"></div>
+        <label style="left:29mm; top:56mm; font-size:5px; color:var(--danger);">eje — ajustar</label>
+        <label style="left:20mm; top:21mm; font-size:5px;">brida motor 40×40</label>
+        <label style="left:5mm; top:63mm; font-size:5px;">borde exterior — flush con el eje</label>
+      </div>
+    </div>
+
+    <div class="stage-block">
+      <div class="stage-title">SOPORTE B</div>
+      <div class="stage" role="img" aria-label="Soporte de motor B: idéntico al soporte A, pieza de 76 por 65 milímetros, con 2 agujeros de varilla del lado que se une a N1, y la brida del motor de 40 por 40 milímetros con sus 4 tornillos del lado del eje">
+        <div class="patch" style="left:2mm; top:2mm;"></div>
+        <div class="patch" style="left:60mm; top:2mm;"></div>
+        <div class="hole" style="left:6.35mm; top:6.35mm;"></div>
+        <div class="hole" style="left:64.35mm; top:6.35mm;"></div>
+
+        <div class="clearzone"></div>
+        <div class="innerline"></div>
+        <label style="left:2mm; top:17mm; font-size:5px;">borde que se une a N1</label>
+        <label style="left:2mm; top:20.5mm; font-size:4.6px; color:var(--faint);">+15mm colchón para el motor</label>
+
+        <div class="flange"></div>
+        <div class="mhole" style="left:23.75mm; top:27.8mm;"></div>
+        <div class="mhole" style="left:50.25mm; top:27.8mm;"></div>
+        <div class="mhole" style="left:23.75mm; top:58.2mm;"></div>
+        <div class="mhole" style="left:50.25mm; top:58.2mm;"></div>
+
+        <div class="shaftgap"></div>
+        <label style="left:29mm; top:56mm; font-size:5px; color:var(--danger);">eje — ajustar</label>
+        <label style="left:20mm; top:21mm; font-size:5px;">brida motor 40×40</label>
+        <label style="left:5mm; top:63mm; font-size:5px;">borde exterior — flush con el eje</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="side" style="width:100%;">
+    <div class="calib-label"><b>Calibración de impresión</b></div>
+    <div class="calib"></div>
+    <div class="calib-label">50.0mm exactos — medí con regla</div>
+
+    <div class="legend">
+      <div><b>Línea sólida negra</b> — contorno de cada pieza (76×65mm). Son idénticas — A y B son la misma pieza, montada en cada extremo de N1.</div>
+      <div><b>Círculo negro con cruz, arriba</b> — agujero de varilla Ø5.3mm, comparte posición con las esquinas de N1.</div>
+      <div><b>Cuadrado verde punteado</b> — brida del motor (40×40mm, medida).</div>
+      <div><b>Círculo verde con cruz</b> — centro de agujero de montaje del motor, Ø4mm. Espaciado 24.5mm (a través del eje) × 30.4mm (a lo largo del eje), centro a centro.</div>
+      <div><b>Rectángulo rojo</b> — abertura del eje, tamaño provisorio. Verificar contra el motor real.</div>
+      <div style="margin-top:2mm;">El borde inferior de cada pieza (el más alejado de N1) queda al ras del eje del motor una vez montado.</div>
+      <div style="margin-top:2mm; color:var(--danger);">⚠️ Nunca tornillo autorroscante en balsa para estos 4 agujeros — tuerca-pasante o inserto roscado, van a cargar todo el torque del motor.</div>
+      <div style="margin-top:2mm;">Si preferís las tres piezas (soporte A + N1 + soporte B) alineadas en una sola tira continua para garantizar que los dos ejes queden colineales, usá <code>docs/plantilla-imprimible-nivel1-completa.html</code> en su lugar — esta hoja es para cuando querés trabajar los soportes por separado de N1.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Generado 2026-08-28. Deriva de <code>CLAUDE.md</code> ("Rediseño del chasis a balsa") y de los datos del motor
+  dados en esta sesión (brida 40×40mm, agujeros Ø4mm, 20.5mm/26.4mm punto-a-punto). Fuente de verdad ante cualquier
+  discrepancia: <code>CLAUDE.md</code>.
+</footer>
+
+</body>
+</html>

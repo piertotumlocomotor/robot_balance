@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>De la teoría a la práctica — Robot autobalanceado, PID y PSO</title>
+<meta name="description" content="Tratado técnico del péndulo invertido de dos ruedas: física, fusión de sensores, control PID, sintonía y optimización por enjambre de partículas, aplicado a un ESP8266 + Arduino Nano.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['\\(', '\\)']],
+    displayMath: [['\\[', '\\]']],
+    tags: 'none'
+  },
+  svg: { fontCache: 'global' },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --bg:        #12151c;
+  --bg-panel:  #191e28;
+  --bg-inset:  #0d0f15;
+  --bg-raised: #202637;
+  --ink:       #e9e6df;
+  --ink-dim:   #9aa0ad;
+  --ink-faint: #6b7180;
+  --rule:      #2a3040;
+  --rule-soft: #1f2431;
+  --accent:    #d98e3a;
+  --accent-ink:#3a2508;
+  --accent-2:  #5fb0ab;
+  --warn:      #c65b4e;
+  --good:      #7fae6a;
+  --serif: 'Spectral', 'Iowan Old Style', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  --mono:  'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  --rail-w: 258px;
+  --content-w: 44rem;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+@media (prefers-reduced-motion:reduce){ html{ scroll-behavior:auto; } }
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16.5px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+::selection{ background:var(--accent); color:var(--accent-ink); }
+
+a{ color:var(--accent-2); text-decoration-thickness:1px; text-underline-offset:3px; }
+a:hover{ color:var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px; border-radius:2px;
+}
+
+h1,h2,h3,h4{
+  font-family:var(--serif);
+  font-weight:600;
+  line-height:1.18;
+  color:var(--ink);
+  text-wrap:balance;
+  letter-spacing:-.01em;
+}
+
+p{ max-width:66ch; }
+.lede{ max-width:56ch; }
+
+code, kbd{ font-family:var(--mono); font-size:.88em; }
+
+/* ============================================================
+   LAYOUT SHELL
+   ============================================================ */
+.shell{
+  display:grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  min-height:100vh;
+}
+@media (max-width: 980px){
+  .shell{ grid-template-columns: 1fr; }
+}
+
+/* ---- rail / instrument index ---- */
+.rail{
+  position:sticky; top:0; align-self:start; height:100vh;
+  overflow-y:auto;
+  border-right:1px solid var(--rule);
+  background:
+    linear-gradient(var(--bg-panel), var(--bg-panel)) padding-box;
+  padding: 1.6rem 1.1rem 2rem;
+}
+@media (max-width: 980px){
+  .rail{ position:static; height:auto; border-right:none; border-bottom:1px solid var(--rule); }
+}
+.rail-mark{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent); display:flex; align-items:center; gap:.5rem; margin-bottom:1.4rem;
+}
+.rail-mark::before{
+  content:""; width:7px; height:7px; border-radius:50%; background:var(--accent);
+  box-shadow:0 0 0 3px rgba(217,142,58,.18);
+}
+.rail-title{
+  font-family:var(--serif); font-weight:600; font-size:1rem; line-height:1.3; margin:0 0 .3rem;
+}
+.rail-sub{ font-size:.78rem; color:var(--ink-dim); margin-bottom:1.6rem; }
+
+.toc{ list-style:none; margin:0; padding:0; border-left:1px solid var(--rule); }
+.toc li{ position:relative; }
+.toc a{
+  display:block; padding:.42rem .8rem .42rem .95rem; margin-left:-1px;
+  border-left:2px solid transparent;
+  color:var(--ink-dim); text-decoration:none; font-size:.84rem;
+  transition:color .15s, border-color .15s, background .15s;
+}
+.toc a .n{ font-family:var(--mono); color:var(--ink-faint); margin-right:.5em; font-size:.82em; }
+.toc a:hover{ color:var(--ink); background:rgba(255,255,255,.02); }
+.toc a.active{ color:var(--accent); border-left-color:var(--accent); background:rgba(217,142,58,.06); }
+.toc a.active .n{ color:var(--accent); }
+.toc .toc-gap{ height:.6rem; }
+
+/* ---- main column ---- */
+main{ min-width:0; }
+.wrap{ max-width: 62rem; margin:0 auto; padding: 0 clamp(1.1rem, 4vw, 3rem) 6rem; }
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{
+  position:relative; overflow:hidden;
+  border-bottom:1px solid var(--rule);
+  padding: clamp(3.2rem,9vw,6rem) clamp(1.1rem,4vw,3rem) clamp(2.4rem,6vw,3.6rem);
+  background: radial-gradient(120% 90% at 15% 0%, #171c28 0%, var(--bg) 60%);
+}
+.hero canvas{ position:absolute; inset:0; width:100%; height:100%; opacity:.85; }
+.hero-inner{ position:relative; max-width:44rem; }
+.hero-eyebrow{
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--accent-2); margin-bottom:1.1rem; display:flex; gap:.6rem; align-items:baseline; flex-wrap:wrap;
+}
+.hero-eyebrow span{ color:var(--ink-faint); }
+h1.hero-title{
+  font-size:clamp(2.1rem, 5vw, 3.4rem); margin:0 0 1rem; font-weight:700;
+}
+h1.hero-title em{ font-style:italic; color:var(--accent); }
+.hero-dek{ color:var(--ink-dim); font-size:1.08rem; max-width:52ch; margin:0 0 1.8rem; }
+.hero-meta{
+  display:flex; gap:1.6rem; flex-wrap:wrap; font-family:var(--mono); font-size:.78rem; color:var(--ink-faint);
+  border-top:1px solid var(--rule); padding-top:1.1rem;
+}
+.hero-meta b{ color:var(--ink-dim); font-weight:500; }
+
+/* ============================================================
+   SECTIONS / TYPOGRAPHY RHYTHM
+   ============================================================ */
+section.doc-section{ padding: 3.6rem 0; border-bottom:1px solid var(--rule-soft); }
+section.doc-section:last-of-type{ border-bottom:none; }
+
+.sec-head{ display:flex; gap:1rem; align-items:baseline; margin-bottom:1.6rem; }
+.sec-num{
+  font-family:var(--mono); font-size:1rem; color:var(--accent); flex:none;
+  border:1px solid var(--rule); border-radius:3px; padding:.15rem .5rem;
+}
+h2{ font-size:clamp(1.5rem,3vw,1.9rem); margin:0; }
+h3{ font-size:1.28rem; margin:2.2rem 0 .9rem; color:var(--ink); }
+h3 .sub-n{ color:var(--ink-faint); font-family:var(--mono); font-size:.78em; margin-right:.5em; }
+h4{ font-size:1.05rem; margin:1.6rem 0 .6rem; color:var(--accent-2); }
+
+.doc-section p, .doc-section li{ color:#d7d4cb; }
+.doc-section ul, .doc-section ol{ padding-left:1.3rem; max-width:66ch; }
+.doc-section li{ margin:.35rem 0; }
+
+.small-caps{
+  font-family:var(--mono); text-transform:uppercase; letter-spacing:.1em; font-size:.72rem; color:var(--ink-faint);
+}
+
+/* ---- callouts ---- */
+.note{
+  margin:1.4rem 0; padding:1rem 1.2rem; border-radius:4px;
+  background:var(--bg-panel); border:1px solid var(--rule); border-left:3px solid var(--accent-2);
+  max-width:60ch;
+}
+.note .note-label{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--accent-2); display:block; margin-bottom:.4rem;
+}
+.note p{ margin:0; font-size:.95rem; color:var(--ink-dim); }
+.note.intuition{ border-left-color:var(--accent); }
+.note.intuition .note-label{ color:var(--accent); }
+
+.callout-warn{
+  margin:1.4rem 0; padding:1rem 1.2rem; border-radius:4px;
+  background:rgba(198,91,78,.08); border:1px solid rgba(198,91,78,.35); border-left:3px solid var(--warn);
+  max-width:66ch;
+}
+.callout-warn .note-label{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--warn); display:block; margin-bottom:.4rem;
+}
+.callout-warn p{ margin:.3rem 0; color:#e7cfc9; }
+
+.callout-real{
+  margin:1.4rem 0; padding:1rem 1.2rem; border-radius:4px;
+  background:rgba(127,174,106,.07); border:1px solid rgba(127,174,106,.3); border-left:3px solid var(--good);
+  max-width:66ch;
+}
+.callout-real .note-label{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--good); display:block; margin-bottom:.4rem;
+}
+.callout-real p{ margin:.3rem 0; color:#cfe0c8; }
+
+/* ---- equations ---- */
+.eq-block{ overflow-x:auto; margin:1.2rem 0; padding:.4rem 0; }
+mjx-container{ color:var(--ink) !important; }
+
+/* ---- figures / panels ---- */
+figure{ margin:1.8rem 0; }
+.panel{
+  background:var(--bg-panel); border:1px solid var(--rule); border-radius:6px;
+  padding:1.3rem 1.4rem 1.5rem; overflow-x:auto;
+}
+.panel-eyebrow{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-faint); margin-bottom:.8rem; display:flex; justify-content:space-between; gap:1rem;
+}
+figcaption{
+  font-size:.86rem; color:var(--ink-dim); margin-top:.8rem; max-width:60ch; line-height:1.55;
+}
+figcaption b{ color:var(--ink); font-weight:600; }
+svg.diagram{ display:block; width:100%; height:auto; }
+svg.diagram text{ font-family:var(--mono); }
+
+/* ---- code ---- */
+pre{
+  background:var(--bg-inset); border:1px solid var(--rule); border-left:3px solid var(--accent-2);
+  border-radius:4px; padding:1rem 1.2rem; overflow-x:auto; font-size:.83rem; line-height:1.55;
+  margin:1.3rem 0;
+}
+pre code{ font-family:var(--mono); color:#d3d8c9; background:none; }
+.tok-c{ color:var(--ink-faint); font-style:italic; }
+.tok-kw{ color:var(--accent-2); }
+.tok-num{ color:var(--accent); }
+.tok-str{ color:var(--good); }
+.tok-fn{ color:#c9b6e0; }
+
+/* ---- tables ---- */
+.table-wrap{ overflow-x:auto; margin:1.3rem 0; }
+table{ border-collapse:collapse; width:100%; min-width:480px; font-size:.88rem; }
+caption{ text-align:left; font-family:var(--mono); font-size:.72rem; color:var(--ink-faint); margin-bottom:.5rem; letter-spacing:.06em; text-transform:uppercase; }
+thead th{
+  font-family:var(--mono); font-weight:500; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+  text-align:left; color:var(--accent-2); border-bottom:1px solid var(--rule); padding:.55rem .8rem;
+}
+tbody td{ padding:.6rem .8rem; border-bottom:1px solid var(--rule-soft); color:#d7d4cb; vertical-align:top; }
+tbody tr:last-child td{ border-bottom:1px solid var(--rule); }
+td, th{ font-variant-numeric:tabular-nums; }
+td.num, th.num{ text-align:right; }
+tbody tr:hover td{ background:rgba(255,255,255,.015); }
+
+/* ---- fail table specific ---- */
+.fail-table td:first-child{ color:var(--ink); font-weight:500; }
+.fail-table td:nth-child(2){ color:#e0b394; }
+
+/* ---- misc ---- */
+hr.rule{ border:none; border-top:1px solid var(--rule); margin:2.4rem 0; }
+.tag-row{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.6rem 0 1.2rem; }
+.tag{
+  font-family:var(--mono); font-size:.7rem; padding:.22rem .55rem; border:1px solid var(--rule);
+  border-radius:20px; color:var(--ink-dim);
+}
+.two-col{ display:grid; grid-template-columns:1fr 1fr; gap:1.6rem; }
+@media (max-width:760px){ .two-col{ grid-template-columns:1fr; } }
+
+footer.colophon{
+  border-top:1px solid var(--rule); padding:2.4rem 0 4rem; color:var(--ink-faint); font-size:.82rem;
+}
+footer.colophon a{ color:var(--ink-dim); }
+
+.skip-link{
+  position:absolute; left:-9999px; top:0; background:var(--accent); color:var(--accent-ink);
+  padding:.6rem 1rem; z-index:100;
+}
+.skip-link:focus{ left:1rem; top:1rem; }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#s0">Saltar al contenido</a>
+
+<div class="shell">
+
+  <!-- ============================================================ RAIL / TOC ============================================================ -->
+  <nav class="rail" aria-label="Índice del documento">
+    <div class="rail-mark">Bitácora de control</div>
+    <p class="rail-title">De la teoría a la práctica</p>
+    <p class="rail-sub">Péndulo invertido de dos ruedas · fusión de sensores · PID · PSO</p>
+    <ul class="toc" id="toc">
+      <li><a href="#s0"><span class="n">§0</span>Sistema y banco de pruebas</a></li>
+      <li><a href="#s1"><span class="n">§1</span>Física del péndulo invertido</a></li>
+      <li><a href="#s2"><span class="n">§2</span>Sensado y fusión</a></li>
+      <li><a href="#s3"><span class="n">§3</span>Teoría del PID</a></li>
+      <li><a href="#s4"><span class="n">§4</span>Métodos de sintonía</a></li>
+      <li><a href="#s5"><span class="n">§5</span>Función de costo</a></li>
+      <li><a href="#s6"><span class="n">§6</span>Teoría de PSO</a></li>
+      <li><a href="#s7"><span class="n">§7</span>Arquitectura de firmware</a></li>
+      <li><a href="#s8"><span class="n">§8</span>Protocolo experimental</a></li>
+      <li><a href="#s9"><span class="n">§9</span>Diagnóstico de fallas</a></li>
+      <li class="toc-gap"></li>
+      <li><a href="#notacion"><span class="n">§</span>Notación</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <!-- ============================================================ HERO ============================================================ -->
+    <header class="hero">
+      <canvas id="swarm" aria-hidden="true"></canvas>
+      <div class="hero-inner">
+        <div class="hero-eyebrow">Control · Estimación · Optimización <span>—</span> ESP8266 + Arduino Nano</div>
+        <h1 class="hero-title">Enderezar lo que quiere<br>caer<em>se</em>.</h1>
+        <p class="hero-dek">Un péndulo invertido de dos ruedas es inestable a propósito. Este documento recorre por qué,
+        cómo se mide su ángulo con un IMU imperfecto, cómo un PID lo sostiene, cómo se sintoniza ese PID con método
+        y no a tanteo, y cómo un enjambre de partículas puede terminar el trabajo que empezó Ziegler y Nichols en 1942.</p>
+        <div class="hero-meta">
+          <span><b>10</b> secciones</span>
+          <span><b>2</b> filtros de fusión derivados</span>
+          <span><b>1</b> enjambre, 3 dimensiones</span>
+          <span><b>0</b> valores inventados sin marcar</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+    <!-- ============================================================ §0 ============================================================ -->
+    <section class="doc-section" id="s0">
+      <div class="sec-head"><span class="sec-num">§0</span><h2>El sistema y el banco de pruebas</h2></div>
+
+      <p class="lede">Antes de cualquier ecuación conviene fijar qué hardware hace qué, y —más importante para no
+      engañarse después— qué es lo que el banco de pruebas realmente permite validar y qué no.</p>
+
+      <h3><span class="sub-n">0.1</span>Reparto de responsabilidades</h3>
+      <p>El sistema tiene tres actores con roles deliberadamente asimétricos:</p>
+      <ul>
+        <li><b>ESP8266 — el cerebro.</b> Lee el IMU por I²C, corre el filtro de fusión que estima el ángulo de
+        inclinación (<em>pitch</em>), calcula la ley de control PID en tiempo real, ejecuta —fuera de línea, entre
+        episodios— el optimizador PSO que ajusta las ganancias de ese PID, y además sostiene el stack de WiFi para
+        telemetría y un panel de control. Todo el cómputo "inteligente" vive aquí.</li>
+        <li><b>Arduino Nano — el ejecutor.</b> No decide nada. Recibe por UART una orden ya calculada (dirección +
+        duty por rueda) y la traduce a PWM hacia el driver. Es, deliberadamente, el eslabón más simple y más
+        predecible de la cadena — una decisión que en <a href="#s7">§7</a> se argumenta también como una decisión
+        de <em>seguridad</em>, no solo de repartición de carga.</li>
+        <li><b>Driver de motores L298N + motores de rueda (JGB37-520B, 6V, 793RPM).</b> Convierte PWM + dirección
+        en el par que efectivamente mueve las ruedas contra el suelo.</li>
+      </ul>
+
+      <figure>
+        <div class="panel">
+          <div class="panel-eyebrow"><span>FIG. 1 — Lazo de control completo</span><span>bloques</span></div>
+          <svg class="diagram" viewBox="0 0 920 300" role="img" aria-labelledby="fig1title fig1desc">
+            <title id="fig1title">Diagrama de bloques del lazo de control</title>
+            <desc id="fig1desc">IMU alimenta un filtro de fusión que entrega el ángulo estimado al PID, que corre en el ESP8266 y envía una orden por UART al Nano, que genera PWM hacia el driver y los motores; la planta física realimenta al IMU. Un bloque PSO, fuera del lazo rápido, ajusta las ganancias del PID entre episodios usando el fitness calculado del mismo registro.</desc>
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#9aa0ad"/>
+              </marker>
+              <marker id="arrAccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#d98e3a"/>
+              </marker>
+            </defs>
+            <style>
+              .blk{ fill:#0d0f15; stroke:#2a3040; stroke-width:1; }
+              .blk-lbl{ fill:#e9e6df; font-size:13px; }
+              .blk-sub{ fill:#9aa0ad; font-size:10px; }
+              .lane{ stroke:#9aa0ad; stroke-width:1.4; fill:none; }
+              .lane-accent{ stroke:#d98e3a; stroke-width:1.4; fill:none; stroke-dasharray:4 3; }
+              .edge-lbl{ fill:#6b7180; font-size:9.5px; letter-spacing:.03em; }
+            </style>
+
+            <!-- ESP8266 boundary -->
+            <rect x="18" y="18" width="560" height="184" rx="6" fill="none" stroke="#1f2431" stroke-width="1" stroke-dasharray="2 4"/>
+            <text x="30" y="34" class="edge-lbl" fill="#5fb0ab">ESP8266 (un núcleo · WiFi + control)</text>
+
+            <!-- IMU -->
+            <rect class="blk" x="34" y="70" width="98" height="56" rx="4"/>
+            <text class="blk-lbl" x="83" y="94" text-anchor="middle">IMU</text>
+            <text class="blk-sub" x="83" y="110" text-anchor="middle">GY-521</text>
+
+            <!-- Fusion -->
+            <rect class="blk" x="176" y="70" width="118" height="56" rx="4"/>
+            <text class="blk-lbl" x="235" y="94" text-anchor="middle">Fusión</text>
+            <text class="blk-sub" x="235" y="110" text-anchor="middle">Kalman / compl.</text>
+
+            <!-- PID -->
+            <rect class="blk" x="338" y="70" width="98" height="56" rx="4"/>
+            <text class="blk-lbl" x="387" y="94" text-anchor="middle">PID</text>
+            <text class="blk-sub" x="387" y="110" text-anchor="middle">§3</text>
+
+            <!-- UART frame -->
+            <rect class="blk" x="480" y="70" width="86" height="56" rx="4" stroke="#5fb0ab"/>
+            <text class="blk-lbl" x="523" y="94" text-anchor="middle" font-size="12">UART</text>
+            <text class="blk-sub" x="523" y="110" text-anchor="middle">frame bin.</text>
+
+            <!-- Nano -->
+            <rect class="blk" x="612" y="70" width="90" height="56" rx="4" stroke="#5fb0ab"/>
+            <text class="blk-lbl" x="657" y="94" text-anchor="middle">Nano</text>
+            <text class="blk-sub" x="657" y="110" text-anchor="middle">PWM ⋅ WDT</text>
+
+            <!-- Driver -->
+            <rect class="blk" x="738" y="70" width="86" height="56" rx="4"/>
+            <text class="blk-lbl" x="781" y="94" text-anchor="middle" font-size="12">Driver</text>
+            <text class="blk-sub" x="781" y="110" text-anchor="middle">L298N</text>
+
+            <!-- Planta -->
+            <rect class="blk" x="738" y="160" width="150" height="56" rx="4" stroke="#d98e3a"/>
+            <text class="blk-lbl" x="813" y="184" text-anchor="middle">Planta</text>
+            <text class="blk-sub" x="813" y="200" text-anchor="middle">robot + piso</text>
+
+            <!-- forward chain -->
+            <path class="lane" d="M132,98 H176" marker-end="url(#arr)"/>
+            <path class="lane" d="M294,98 H338" marker-end="url(#arr)"/>
+            <text class="edge-lbl" x="316" y="90" text-anchor="middle">θ̂</text>
+            <path class="lane" d="M436,98 H480" marker-end="url(#arr)"/>
+            <text class="edge-lbl" x="458" y="90" text-anchor="middle">u</text>
+            <path class="lane" d="M566,98 H612" marker-end="url(#arr)"/>
+            <path class="lane" d="M702,98 H738" marker-end="url(#arr)"/>
+            <path class="lane" d="M824,126 V160" marker-end="url(#arr)"/>
+
+            <!-- feedback -->
+            <path class="lane" d="M738,188 H83 V126" marker-end="url(#arr)"/>
+            <text class="edge-lbl" x="410" y="204" text-anchor="middle">realimentación mecánica (inclinación real)</text>
+
+            <!-- PSO outer loop -->
+            <rect class="blk" x="176" y="230" width="260" height="56" rx="4" stroke="#d98e3a" fill="#171310"/>
+            <text class="blk-lbl" x="306" y="254" text-anchor="middle" fill="#f0c896">PSO</text>
+            <text class="blk-sub" x="306" y="270" text-anchor="middle">entre episodios · §6</text>
+            <path class="lane-accent" d="M387,126 V230" marker-end="none"/>
+            <path class="lane-accent" d="M306,230 V150 H387" marker-end="url(#arrAccent)"/>
+            <text class="edge-lbl" x="230" y="222" text-anchor="middle" fill="#d98e3a">Kp, Ki, Kd</text>
+            <path class="lane-accent" d="M180,258 H60 V126" marker-end="url(#arrAccent)"/>
+            <text class="edge-lbl" x="60" y="200" text-anchor="middle" fill="#d98e3a" transform="rotate(-90 60 200)">J (fitness, §5)</text>
+          </svg>
+        </div>
+        <figcaption><b>Fig. 1.</b> El lazo rápido (IMU → fusión → PID → UART → Nano → PWM → planta → IMU) corre
+        íntegramente dentro del ESP8266 a la tasa de control. El PSO es un lazo <em>lento</em>, externo, que solo
+        interviene entre episodios de prueba, leyendo el mismo fitness \(J\) que también reporta el programa de
+        línea base — de ahí la línea punteada, para remarcar que no es parte del tiempo real del sistema.</figcaption>
+      </figure>
+
+      <h3><span class="sub-n">0.2</span>El banco de pruebas: ruedas en el piso, no péndulo colgante</h3>
+      <p>Una decisión importante y fácil de subestimar: el robot se prueba con las <b>ruedas apoyadas en el
+      piso</b>, no suspendido de forma que las ruedas giren libremente en el aire. La diferencia no es cosmética.
+      Un montaje colgante elimina precisamente la dinámica que se quiere estudiar: la fricción rueda-suelo, la
+      inercia real que hay que vencer para acelerar la base, y la zona muerta del actuador bajo carga real. Todo
+      eso solo aparece con las ruedas tocando el piso — es el mismo argumento por el que la zona muerta de los
+      motores debe medirse con carga real, no solo con las ruedas girando libres. La primera medición de este
+      banco (duty≈77/255) se hizo en el piso, pero con ambos motores barridos a la vez, así que todavía no separa
+      cuánto de ese umbral es fricción de rodadura real y cuánto es fricción de rodamientos común a ambas
+      condiciones — un protocolo que mida los dos motores por separado, en el aire y en el piso, cierra esa
+      pregunta (ver <a href="#s9">§9</a>).</p>
+
+      <h3><span class="sub-n">0.3</span>Geometría del arnés de seguridad</h3>
+      <p>El robot cuelga de una cuerda anclada a un punto <b>fijo</b> \(A\), a una altura \(h\) sobre el punto de
+      sujeción del robot \(P\) cuando este está perfectamente vertical. La cuerda tiene <b>holgura</b>: su longitud
+      real \(L = h+s\) es mayor que la distancia recta \(h\), de modo que no ofrece tensión durante el balanceo
+      normal — solo debe tensarse cerca del límite de caída (\(\theta_\text{max}\approx 30°\)).</p>
+
+      <p>Para diseñar \(s\) con criterio —no "un poco de cuerda de más"— hace falta un modelo geométrico. Fijemos
+      el eje de las ruedas en el origen y llamemos \(r\) a la altura del punto de sujeción \(P\) sobre ese eje.
+      Con el robot inclinado un ángulo \(\theta\) (rotación rígida alrededor del eje de las ruedas, sin
+      desplazamiento horizontal todavía):</p>
+
+      <div class="eq-block">\[
+      P(\theta) = (r\sin\theta,\; r\cos\theta), \qquad A = (0,\; r+h)
+      \]</div>
+
+      <p>La distancia anclaje–sujeción es entonces</p>
+
+      <div class="eq-block">\[
+      d(\theta) = \sqrt{r^2\sin^2\theta + \big(h + r(1-\cos\theta)\big)^2}
+      \]</div>
+
+      <p>y la cuerda se tensa exactamente cuando \(d(\theta) = h+s\). Para ángulos pequeños conviene una
+      aproximación: expandiendo \(\sin\theta\) y \(\cos\theta\) a orden \(\theta^2\) y despreciando términos de
+      orden superior,</p>
+
+      <div class="eq-block">\[
+      d(\theta) - h \;\approx\; \frac{r(r+h)}{2h}\,\theta^2
+      \]</div>
+
+      <div class="note intuition">
+        <span class="note-label">Intuición</span>
+        <p>Con el anclaje justo arriba del punto de reposo, inclinar un poco el robot casi no aleja a \(P\) de
+        \(A\) — el acercamiento es de segundo orden, como cuando un péndulo se aparta poco de su punto más bajo.
+        Por eso una holgura chica alcanza para un rango angular sorprendentemente amplio antes de tensarse.</p>
+      </div>
+
+      <p>Este resultado es la justificación cuantitativa de "no ofrece tensión durante el balanceo normal": la
+      longitud extra necesaria crece con \(\theta^2\), no linealmente, así que una holgura modesta cubre el rango
+      de pitch normal de operación (unos pocos grados) sin acercarse a tensarse, y solo empieza a exigir longitud
+      real cuando \(\theta\) se acerca al límite de diseño.</p>
+
+      <div class="table-wrap">
+        <table>
+          <caption>Ejemplo numérico — \(r=0.20\,\text{m}\), \(h=0.50\,\text{m}\)</caption>
+          <thead><tr><th>Ángulo \(\theta\)</th><th class="num">\(d(\theta)-h\) exacto</th><th class="num">Aproximación \(\theta^2\)</th></tr></thead>
+          <tbody>
+            <tr><td>10°</td><td class="num">0.42 cm</td><td class="num">0.43 cm</td></tr>
+            <tr><td>20°</td><td class="num">1.68 cm</td><td class="num">1.71 cm</td></tr>
+            <tr><td>30° (límite)</td><td class="num">3.62 cm</td><td class="num">3.84 cm</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Es decir: con \(r\approx20\,\text{cm}\) y \(h=50\,\text{cm}\), una holgura de apenas <b>\(s\approx3.6\)–\(3.8\,\text{cm}\)</b>
+      basta para que la cuerda se mantenga floja hasta prácticamente el ángulo de caída, y se tense justo ahí. La
+      aproximación cuadrática se desvía del valor exacto solo un 6% incluso a 30°, así que sirve bien para
+      dimensionar la holgura de entrada — y luego se verifica y ajusta a mano, levantando el robot gradualmente y
+      marcando dónde se tensa de verdad (ver la fila correspondiente en la tabla de fallas de <a href="#s9">§9</a>).</p>
+
+      <figure>
+        <div class="panel">
+          <div class="panel-eyebrow"><span>FIG. 2 — Geometría del arnés</span><span>vista lateral</span></div>
+          <svg class="diagram" viewBox="0 0 640 320" role="img" aria-labelledby="fig2title fig2desc">
+            <title id="fig2title">Geometría del arnés de seguridad</title>
+            <desc id="fig2desc">Vista lateral: anclaje fijo A por encima del punto de reposo del punto de sujeción P, el robot rotado un ángulo theta desde la vertical alrededor del eje de las ruedas O, con la cuerda de longitud h+s uniendo A y P.</desc>
+            <style>
+              .g-ln{ stroke:#9aa0ad; stroke-width:1.3; fill:none; }
+              .g-dash{ stroke:#6b7180; stroke-width:1; stroke-dasharray:3 3; fill:none; }
+              .g-cord{ stroke:#d98e3a; stroke-width:1.6; fill:none; }
+              .g-lbl{ fill:#d7d4cb; font-size:12px; }
+              .g-lbl-dim{ fill:#9aa0ad; font-size:11px; }
+            </style>
+            <!-- floor -->
+            <line x1="20" y1="290" x2="620" y2="290" class="g-ln"/>
+            <line x1="20" y1="290" x2="35" y2="300" class="g-ln"/>
+            <line x1="50" y1="290" x2="65" y2="300" class="g-ln"/>
+            <line x1="80" y1="290" x2="95" y2="300" class="g-ln"/>
+
+            <!-- wheel axle O -->
+            <circle cx="180" cy="290" r="5" fill="#e9e6df"/>
+            <text class="g-lbl" x="180" y="312" text-anchor="middle">O (eje ruedas)</text>
+
+            <!-- anchor A -->
+            <circle cx="180" cy="60" r="4" fill="#d98e3a"/>
+            <rect x="164" y="30" width="32" height="16" fill="none" stroke="#d98e3a" stroke-width="1"/>
+            <line x1="180" y1="46" x2="180" y2="56" class="g-cord"/>
+            <text class="g-lbl" x="200" y="55" fill="#d98e3a">A (anclaje fijo)</text>
+
+            <!-- vertical reference dashed from O -->
+            <line x1="180" y1="290" x2="180" y2="60" class="g-dash"/>
+
+            <!-- body tilted theta -->
+            <g transform="rotate(-24 180 290)">
+              <rect x="164" y="140" width="32" height="150" rx="4" fill="#191e28" stroke="#2a3040"/>
+              <circle cx="180" cy="170" r="5" fill="#5fb0ab"/>
+              <text class="g-lbl" x="200" y="174" fill="#5fb0ab" transform="rotate(24 200 174)">P (sujeción)</text>
+              <!-- r dimension -->
+              <line x1="150" y1="290" x2="150" y2="170" class="g-dash"/>
+              <text class="g-lbl-dim" x="120" y="235" transform="rotate(-90 120 235)">r</text>
+            </g>
+
+            <!-- theta arc -->
+            <path d="M180,240 A50,50 0 0,1 210,255" class="g-ln" fill="none"/>
+            <text class="g-lbl-dim" x="214" y="248">θ</text>
+
+            <!-- cord from A to P(theta) -->
+            <line x1="180" y1="60" x2="240.5" y2="196" class="g-cord" stroke-dasharray="1 0"/>
+            <text class="g-lbl" x="270" y="120" fill="#d98e3a">cuerda, L = h+s</text>
+
+            <!-- h dimension -->
+            <line x1="60" y1="290" x2="60" y2="60" class="g-ln"/>
+            <text class="g-lbl-dim" x="40" y="175" transform="rotate(-90 40 175)">h</text>
+
+            <text class="g-lbl-dim" x="330" y="290">superficie de prueba (piso real)</text>
+          </svg>
+        </div>
+        <figcaption><b>Fig. 2.</b> Cuando el robot se inclina \(\theta\), el punto de sujeción \(P\) describe un
+        arco de radio \(r\) alrededor del eje de las ruedas \(O\). El anclaje \(A\) queda fijo respecto del piso.
+        La distancia \(d(\theta)\) crece con \(\theta\); la cuerda se tensa cuando esa distancia alcanza \(h+s\).</figcaption>
+      </figure>
+
+      <h3><span class="sub-n">0.4</span>Qué valida el arnés, y qué no — honestamente</h3>
+      <p>Hay una segunda restricción, independiente de la anterior, que importa aún más para diseñar el
+      experimento: el anclaje es un <b>punto fijo</b> del piso, no algo que viaje con el robot. Si el robot se
+      desplaza horizontalmente una distancia \(\Delta x\) manteniéndose vertical (\(\theta\approx0\)), la distancia
+      anclaje–sujeción es simplemente \(d=\sqrt{\Delta x^2+h^2}\), y el mismo criterio de tensado da un
+      desplazamiento horizontal máximo permitido:</p>
+
+      <div class="eq-block">\[
+      \Delta x_\text{max} = \sqrt{(h+s)^2 - h^2} = \sqrt{2hs+s^2}
+      \]</div>
+
+      <p>Con los mismos números del ejemplo (\(h=0.50\,\text{m}\), \(s\approx0.038\,\text{m}\)), esto da
+      \(\Delta x_\text{max}\approx0.195\,\text{m}\) — unos <b>20 cm</b> de radio útil alrededor del punto de
+      anclaje. Ese número, no el ángulo de 30°, es el que realmente acota qué se puede probar en este banco.</p>
+
+      <div class="callout-real">
+        <span class="note-label">Lo que sí valida</span>
+        <p>El lazo de <b>ángulo</b> (el PID que mantiene \(\theta\approx0\)) con la dinámica de contacto rueda-piso
+        real: fricción, zona muerta del actuador bajo carga, y perturbaciones dentro de un rango angular amplio
+        (hasta cerca de 30°) con una red de seguridad real si algo sale mal.</p>
+      </div>
+      <div class="callout-warn">
+        <span class="note-label">Lo que no valida</span>
+        <p>Cualquier lazo de <b>posición</b> \(x\) que requiera desplazamientos mayores a ~20 cm del punto de
+        anclaje, trayectorias largas, o navegación. Tampoco valida guiñada (yaw), terrenos irregulares, ni el
+        comportamiento más allá de la zona de captura del arnés. Esta es, entre otras cosas, una de las razones
+        por las que <a href="#s3">§3</a> pospone explícitamente el control en cascada de posición: no hay forma
+        honesta de sintonizarlo ni validarlo en este banco todavía.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ §1 ============================================================ -->
+    <section class="doc-section" id="s1">
+      <div class="sec-head"><span class="sec-num">§1</span><h2>Física del péndulo invertido</h2></div>
+
+      <h3><span class="sub-n">1.1</span>Modelo de Lagrange (carro-péndulo)</h3>
+      <p>El modelo canónico es un péndulo montado sobre una base que se puede acelerar horizontalmente. Sea \(x\)
+      la posición horizontal de la base (controlada, en última instancia, por el par de las ruedas) y \(\theta\)
+      el ángulo del cuerpo respecto de la vertical. Con \(M\) la masa efectiva de la base+ruedas, \(m\) la masa del
+      cuerpo del robot concentrada en su centro de masa a distancia \(l\) del eje de las ruedas, e \(I\) el momento
+      de inercia del cuerpo respecto de su propio centro de masa, la energía cinética y potencial son:</p>
+
+      <div class="eq-block">\[
+      T = \tfrac{1}{2}(M+m)\dot{x}^2 + m\,l\,\dot{x}\dot{\theta}\cos\theta + \tfrac{1}{2}(I+ml^2)\dot{\theta}^2,
+      \qquad V = m g l \cos\theta
+      \]</div>
+
+      <p>Aplicando las ecuaciones de Euler–Lagrange \(\frac{d}{dt}\frac{\partial \mathcal{L}}{\partial \dot q_i} -
+      \frac{\partial \mathcal{L}}{\partial q_i}=Q_i\) sobre \(\mathcal{L}=T-V\) para \(q=(x,\theta)\), con \(F\) la
+      fuerza horizontal neta que las ruedas aplican al suelo (reacción que empuja la base):</p>
+
+      <div class="eq-block">\[
+      \begin{aligned}
+      (M+m)\ddot{x} + ml\ddot\theta\cos\theta - ml\dot\theta^2\sin\theta &= F \\[2pt]
+      (I+ml^2)\ddot\theta + ml\ddot{x}\cos\theta - mgl\sin\theta &= 0
+      \end{aligned}
+      \]</div>
+
+      <p>Este par de ecuaciones acopladas y no lineales es exacto, pero difícil de razonar a simple vista. Todo el
+      trabajo de control ocurre cerca de \(\theta=0\), así que conviene linealizar.</p>
+
+      <h3><span class="sub-n">1.2</span>Por qué aparece un polo inestable</h3>
+      <p>Para aislar la física esencial —y evitar cargar el álgebra completa de 4 estados—, conviene una
+      simplificación estándar en estos análisis: tratar la aceleración de la base \(a=\ddot{x}\) directamente como
+      la variable de control (es, salvo una constante, lo que las ruedas producen), y escribir el balance de
+      torques del cuerpo alrededor del eje de las ruedas <em>en el marco no inercial de la base</em>, donde
+      aparece una fuerza ficticia \(-ma\) actuando en el centro de masa:</p>
+
+      <div class="eq-block">\[
+      I_p\,\ddot\theta = mgl\sin\theta - mal\cos\theta, \qquad I_p \equiv I+ml^2
+      \]</div>
+
+      <p>(el teorema de ejes paralelos da \(I_p\), el momento de inercia respecto del eje de las ruedas). Esta
+      expresión es algebraicamente consistente con las ecuaciones de Lagrange de arriba, y expone con claridad los
+      dos términos en juego: <b>gravedad</b>, que crece con \(\sin\theta\) y siempre empuja <em>alejando</em> al
+      péndulo de la vertical (desestabilizante), y <b>control</b>, la aceleración de la base, que puede
+      contrarrestarla.</p>
+
+      <p>Linealizando en \(\theta\approx0\) (\(\sin\theta\approx\theta\), \(\cos\theta\approx1\)) y definiendo el
+      estado \(z=[\theta,\dot\theta]^\top\):</p>
+
+      <div class="eq-block">\[
+      \dot\theta = \omega_0^2\,\theta - b\,a, \qquad
+      \dot z = \underbrace{\begin{bmatrix}0 & 1\\ \omega_0^2 & 0\end{bmatrix}}_{A} z +
+               \underbrace{\begin{bmatrix}0\\-b\end{bmatrix}}_{B} a,
+      \qquad \omega_0^2=\frac{mgl}{I_p},\;\; b=\frac{ml}{I_p}
+      \]</div>
+
+      <p>El polinomio característico de \(A\) es \(\lambda^2-\omega_0^2=0\), con raíces \(\lambda=\pm\omega_0\).
+      Ahí está el resultado que importa: <b>hay siempre un polo real positivo</b> \(\lambda=+\omega_0\) —no un par
+      complejo, no algo marginal— sin importar los valores concretos de \(m\), \(l\) o \(I_p\), en cuanto
+      \(mgl>0\). Es un punto de equilibrio tipo <em>silla</em>: cualquier desviación crece exponencialmente sin
+      intervención activa. Esto es, formalmente, la razón por la que "el equilibrio es inestable" no es una forma
+      de hablar sino una propiedad algebraica del sistema linealizado.</p>
+
+      <div class="note intuition">
+        <span class="note-label">Intuición</span>
+        <p>Un péndulo colgando hacia abajo tiene un polo imaginario puro (oscila, no crece). Invertirlo cambia el
+        signo de un único término en la ecuación —el de gravedad— y ese cambio de signo convierte una oscilación
+        eterna en una caída exponencial. Es literalmente la misma física con un signo distinto.</p>
+      </div>
+
+      <h3><span class="sub-n">1.3</span>Midiendo \(\omega_0\) sin descomponer una masa no homogénea</h3>
+      <p>\(\omega_0=\sqrt{mgl/I_p}\) tiene unidades de \(\text{rad/s}\) y fija la escala de tiempo natural de la
+      inestabilidad: \(\tau=1/\omega_0\) es el tiempo característico en el que una perturbación se multiplica por
+      \(e\) si nadie interviene. El problema práctico es que \(m\), \(l\) (altura del centro de masa) e \(I_p\)
+      son difíciles de estimar por separado en un chasis de tres niveles de madera con batería, placas y motores
+      repartidos de forma no homogénea — cualquier descomposición pieza por pieza arrastra bastante incertidumbre.</p>
+
+      <p>Hay una salida que evita el problema por completo, en vez de intentar resolverlo. La misma \(I_p\)
+      —momento de inercia respecto del eje de las ruedas— aparece sin cambios si, en lugar de pararse (equilibrio
+      inestable), el robot <b>cuelga libremente de ese mismo eje</b> (equilibrio estable, un péndulo común). La
+      única diferencia entre ambas configuraciones es el signo del término gravitacional: colgando, la ecuación
+      linealizada es \(\ddot\theta=-\omega_0^2\theta\) (oscila); parado es \(\ddot\theta=+\omega_0^2\theta\)
+      (diverge). La <em>magnitud</em> \(\omega_0\) es idéntica en los dos casos, porque depende de los mismos
+      \(m\), \(g\), \(l\), \(I_p\) — nada de eso cambia si el cuerpo está arriba o abajo del pivote. El péndulo
+      colgante oscila con período:</p>
+
+      <div class="eq-block">\[
+      T_\text{colgado} = \frac{2\pi}{\omega_0} \quad\Longrightarrow\quad \omega_0 = \frac{2\pi}{T_\text{colgado}}
+      \]</div>
+
+      <p>Cronometrar cuánto tarda el robot en oscilar colgado del eje de las ruedas da \(\omega_0\) directamente
+      — sin pesar cada nivel del chasis ni localizar el centro de masa. Basta con dejarlo oscilar libremente
+      (empujón chico, 10–15°) y cronometrar varias oscilaciones completas —diez, para repartir el error de
+      reacción al usar el cronómetro— y dividir. El propio giroscopio del Test 1 (ya operativo, reporta por WiFi)
+      sirve para contar cruces por cero con más precisión que a ojo.</p>
+
+      <div class="callout-warn">
+        <span class="note-label">Medición pendiente en este proyecto</span>
+        <p>Esta medición todavía no se hizo — no hay un \(\omega_0\) real de este robot todavía, y no se inventa
+        uno acá. Lo que sí puede calcularse sin ese dato es el umbral que le exige la regla de muestreo (10–20×
+        la dinámica más rápida) a los <b>50 Hz</b> que ya usa el Test 1: despejando,
+        \(\omega_0\lesssim10\text{–}20\,\text{Hz}\times2\pi/10\approx15\text{–}31\,\text{rad/s}\) para tener
+        margen. Es decir, \(\tau=1/\omega_0\gtrsim32\text{–}64\,\text{ms}\). El período colgante medido dirá si el
+        robot real cae dentro de ese margen o si hace falta subir la tasa del lazo de <em>control</em> (no
+        necesariamente la de reporte por WiFi) antes de cerrar el lazo, tal como se detalla en <a href="#s7">§7</a>
+        con el timer de hardware.</p>
+      </div>
+
+      <h3><span class="sub-n">1.4</span>Ancho de banda alcanzable y fase no mínima</h3>
+      <p>Hay un límite adicional, y este no se arregla subiendo la tasa de muestreo: cuando eventualmente se cierre
+      un lazo <em>externo</em> de posición (mover el robot a un \(x\) deseado generando un ángulo de referencia
+      pequeño para el lazo interno), la función de transferencia de la fuerza de las ruedas a la <b>posición</b>
+      del carro —no al ángulo— tiene un cero en el semiplano derecho: es un sistema de <b>fase no mínima</b>.</p>
+      <p>La intuición física es directa: para acelerar hacia adelante, las ruedas primero tienen que inclinar el
+      cuerpo hacia adelante, y para inclinarlo hacia adelante deben empujar momentáneamente <em>hacia atrás</em>.
+      El robot "retrocede antes de avanzar" ante un comando de posición — un comportamiento característico de los
+      ceros de fase no mínima, no un defecto de sintonía. Esto acota el ancho de banda máximo que cualquier
+      controlador de posición puede alcanzar sin comprometer estabilidad, sin importar qué tan bien sintonizado
+      esté. Es una limitación estructural de la planta, y una razón adicional —independiente de la del arnés en
+      <a href="#s0">§0</a>— para tratar el lazo de posición como un problema separado y posterior.</p>
+    </section>
+
+    <!-- ============================================================ §2 ============================================================ -->
+    <section class="doc-section" id="s2">
+      <div class="sec-head"><span class="sec-num">§2</span><h2>Sensado y fusión de señales</h2></div>
+
+      <h3><span class="sub-n">2.1</span>Qué mide cada sensor, y cómo falla</h3>
+      <p>El acelerómetro no mide "inclinación": mide <b>aceleración específica</b>, la fuerza no gravitacional por
+      unidad de masa a lo largo de cada eje. En reposo, sobre una masa de prueba que no acelera, la única fuerza
+      no gravitacional es la normal del soporte, que exactamente cancela la gravedad — así que el acelerómetro
+      "siente" \(-\vec g\) proyectada sobre sus ejes, y de ahí se puede recuperar el ángulo respecto de la
+      vertical por trigonometría. El problema: si el robot además acelera linealmente (algo que un péndulo
+      invertido corrigiendo su equilibrio hace todo el tiempo), esa aceleración se suma a la de gravedad y el
+      cálculo de ángulo se contamina — el error no es ruido aleatorio, está <em>correlacionado</em> con el propio
+      movimiento que se quiere controlar.</p>
+      <p>El giroscopio mide velocidad angular directamente, sin ser sensible a la aceleración lineal — pero
+      integrar su lectura para obtener ángulo acumula cualquier sesgo (<em>bias</em>) de forma indefinida: un
+      sesgo constante de solo \(0.5°/s\) integrado durante 10 s ya son \(5°\) de error acumulado, sin que el
+      sensor esté "roto". Peor: ese sesgo no es una constante de fábrica, deriva con la temperatura y el tiempo de
+      encendido.</p>
+
+      <div class="callout-real">
+        <span class="note-label">Dato real de este proyecto</span>
+        <p>Por esta razón el bias del giroscopio se recalibra en cada arranque de cada sketch de prueba (promediando
+        cientos de muestras con el robot quieto), en vez de hardcodearse como constante — es exactamente la
+        consecuencia práctica de que el sesgo <em>varía</em> entre sesiones.</p>
+      </div>
+
+      <p>Los dos sensores fallan en bandas de frecuencia complementarias: el acelerómetro es confiable en
+      continua/baja frecuencia (a largo plazo, sin aceleración neta, apunta bien "hacia abajo") pero ruidoso y
+      sesgado por movimiento propio en alta frecuencia; el giroscopio es confiable en alta frecuencia (sin ruido
+      de vibración lineal) pero deriva en baja frecuencia/continua. Esa complementariedad es, literalmente, de
+      donde sale el nombre del primer filtro.</p>
+
+      <h3><span class="sub-n">2.2</span>Filtro complementario</h3>
+      <p>La idea: pasar la estimación de ángulo del acelerómetro por un pasa-bajos, la del giroscopio integrado
+      por un pasa-altos, y sumar — si ambas transferencias suman 1 en todo el espectro, el resultado no distorsiona
+      una señal que estuviera perfectamente medida por ambos caminos a la vez. En su forma discreta más común:</p>
+
+      <div class="eq-block">\[
+      \hat\theta[k] = \alpha\big(\hat\theta[k-1] + \omega_\text{gyro}[k]\,\Delta t\big) + (1-\alpha)\,\theta_\text{accel}[k]
+      \]</div>
+
+      <p><b>Deducción de \(\alpha\).</b> En tiempo continuo, un pasa-bajos de primer orden con constante de tiempo
+      \(\tau\) tiene \(H_\text{lp}(s)=\frac{1}{1+\tau s}\); su complemento —el pasa-altos con el mismo corte— es
+      \(H_\text{hp}(s)=1-H_\text{lp}(s)=\frac{\tau s}{1+\tau s}\). Discretizando el pasa-bajos como un promedio
+      móvil exponencial con período de muestreo \(\Delta t\), la correspondencia estándar entre la constante de
+      tiempo continua y el coeficiente discreto es:</p>
+
+      <div class="eq-block">\[
+      \alpha = \frac{\tau}{\tau + \Delta t}
+      \]</div>
+
+      <p>\(\tau\) es, en esencia, "cuánto tiempo confiar en el giro antes de dejar que el acelerómetro corrija".
+      Con \(\tau=1\,\text{s}\) y un lazo a 200 Hz (\(\Delta t=5\,\text{ms}\)):</p>
+
+      <div class="eq-block">\[
+      \alpha = \frac{1}{1+0.005} \approx 0.995
+      \]</div>
+
+      <p>es decir, en cada paso el 99.5% del nuevo ángulo viene de integrar el giro, y solo el 0.5% de la lectura
+      cruda del acelerómetro — suficiente para ir corrigiendo la deriva sin dejar que el ruido del acelerómetro
+      contamine la estimación rápida.</p>
+
+      <div class="note intuition">
+        <span class="note-label">Intuición</span>
+        <p>Es un <em>crossover</em> de parlantes: los graves (tendencias lentas, DC) van al woofer —el
+        acelerómetro—; los agudos (cambios rápidos) van al tweeter —el giro integrado—. Cada altavoz reproduce
+        solo la banda en la que suena bien.</p>
+      </div>
+
+      <h3><span class="sub-n">2.3</span>Filtro de Kalman — teoría completa</h3>
+      <p>El complementario tiene un solo parámetro libre (\(\alpha\), equivalentemente \(\tau\)) elegido a mano, y
+      asume que el bias del giro ya fue restado de antemano. El filtro de Kalman resuelve ambas limitaciones
+      modelando explícitamente el bias como parte del estado y ponderando automáticamente, en cada paso, cuánto
+      confiar en el modelo versus en la medida — según qué tan ruidosos sean uno y otra.</p>
+
+      <h4>Modelo de espacio de estados</h4>
+      <p>Estado: \(x=[\theta,\ \beta]^\top\), con \(\beta\) el sesgo (bias) del giro. El modelo de proceso dice que
+      la velocidad angular <em>real</em> es la lectura cruda del giro menos su sesgo, y que el sesgo evoluciona
+      como un paseo aleatorio lento:</p>
+
+      <div class="eq-block">\[
+      \dot\theta = \omega_\text{gyro} - \beta + w_\theta, \qquad \dot\beta = w_\beta
+      \]</div>
+
+      <p>Discretizado con período \(\Delta t\), en forma matricial \(x[k]=Fx[k-1]+Bu[k]+w\):</p>
+
+      <div class="eq-block">\[
+      \underbrace{\begin{bmatrix}\theta\\ \beta\end{bmatrix}}_{x[k]} =
+      \underbrace{\begin{bmatrix}1 & -\Delta t\\ 0 & 1\end{bmatrix}}_{F}
+      \underbrace{\begin{bmatrix}\theta\\ \beta\end{bmatrix}}_{x[k-1]} +
+      \underbrace{\begin{bmatrix}\Delta t\\ 0\end{bmatrix}}_{B}\,\omega_\text{gyro}[k] + w,\qquad w\sim\mathcal N(0,Q)
+      \]</div>
+
+      <p>La medida es el ángulo que da el acelerómetro por trigonometría, \(z[k]=H x[k]+v\), con \(H=[1\;\;0]\)
+      (el acelerómetro no observa el bias directamente) y \(v\sim\mathcal N(0,R)\) ruido de medida escalar.</p>
+
+      <h4>Predicción y corrección</h4>
+      <div class="eq-block">\[
+      \begin{aligned}
+      \textbf{Predicción:}\quad & \hat x^-[k] = F\hat x[k-1] + Bu[k], \qquad P^-[k] = FP[k-1]F^\top + Q \\[8pt]
+      \textbf{Corrección:}\quad & S[k] = HP^-[k]H^\top + R \\
+      & K[k] = P^-[k]H^\top S[k]^{-1} \\
+      & \hat x[k] = \hat x^-[k] + K[k]\big(z[k]-H\hat x^-[k]\big) \\
+      & P[k] = (I-K[k]H)\,P^-[k]
+      \end{aligned}
+      \]</div>
+
+      <p><b>Qué son \(Q\) y \(R\), y cómo se eligen en la práctica.</b> \(R\) es la varianza del ruido de medida
+      del acelerómetro — se mide directamente: con el robot quieto, se toman muchas muestras del ángulo derivado
+      del acelerómetro y se calcula su varianza muestral. \(Q\) es la covarianza del ruido de <em>proceso</em>:
+      \(Q_\theta\) grande dice "no confíes demasiado en integrar el giro, corrige rápido con la medida";
+      \(Q_\beta\) —normalmente mucho más chico, porque el sesgo cambia lento— dice qué tan rápido se le permite al
+      filtro "creer" que el bias estimado cambió. En la práctica, \(R\) se mide y \(Q\) se ajusta empíricamente,
+      partiendo de un orden de magnitud y observando el compromiso entre respuesta rápida (\(Q\) grande, más
+      ruidoso) y suavizado con retardo (\(Q\) chico, más lento a seguir cambios reales).</p>
+
+      <div class="callout-real">
+        <span class="note-label">Dato real de este proyecto</span>
+        <p>La calibración de este mismo IMU midió una desviación estándar de la magnitud de aceleración en reposo
+        del orden de \(\sigma\approx0.02\)–\(0.04\,\text{m/s}^2\) según la corrida — ese es, directamente, el tipo
+        de número del que se deriva \(R\) para el ángulo del acelerómetro (propagando esa varianza a través de la
+        trigonometría del ángulo).</p>
+      </div>
+
+      <p><b>Por qué la ganancia de Kalman pondera automáticamente.</b> Mirando la fórmula \(K=P^-H^\top S^{-1}\):
+      si \(R\) es grande (medida muy ruidosa), \(S\) crece y \(K\) se achica — el filtro confía más en la
+      predicción del modelo (integrar el giro) y casi ignora una medida puntual mala. Si \(Q\) es grande (poca
+      confianza en el modelo), \(P^-\) crece y \(K\) aumenta — el filtro corrige agresivamente con cada medida
+      nueva. A diferencia del complementario, esta ponderación no es un número fijo elegido una vez: se recalcula
+      en cada paso a partir de las covarianzas, aunque en estado estacionario (cuando \(P\) converge a un valor
+      constante) también termina siendo, en la práctica, casi constante — y de hecho puede demostrarse que el
+      complementario de un polo es un caso límite del Kalman de este mismo modelo, en su ganancia de estado
+      estacionario, para una elección particular de \(Q\) y \(R\). No son dos ideas distintas: son el mismo
+      principio con distinto nivel de sofisticación.</p>
+
+      <h4>Implementación de referencia (2 estados, medida escalar)</h4>
+      <pre><code><span class="tok-c">// Kalman 2 estados [theta, bias] para un robot balanceador.
+// H = [1 0]; medida escalar => S es escalar, no hace falta inversion de matriz.</span>
+<span class="tok-kw">struct</span> KalmanState {
+  <span class="tok-kw">float</span> theta = <span class="tok-num">0</span>, bias = <span class="tok-num">0</span>;
+  <span class="tok-kw">float</span> P[<span class="tok-num">2</span>][<span class="tok-num">2</span>] = {{<span class="tok-num">1</span>,<span class="tok-num">0</span>},{<span class="tok-num">0</span>,<span class="tok-num">1</span>}};
+  <span class="tok-kw">float</span> Q_theta = <span class="tok-num">0.001f</span>, Q_bias = <span class="tok-num">0.003f</span>, R_measure = <span class="tok-num">0.03f</span>;
+};
+
+<span class="tok-kw">float</span> <span class="tok-fn">kalmanUpdate</span>(KalmanState&amp; k, <span class="tok-kw">float</span> gyroRate, <span class="tok-kw">float</span> accelAngle, <span class="tok-kw">float</span> dt) {
+  <span class="tok-c">// --- Prediccion ---</span>
+  k.theta += dt * (gyroRate - k.bias);
+
+  k.P[<span class="tok-num">0</span>][<span class="tok-num">0</span>] += dt * (dt*k.P[<span class="tok-num">1</span>][<span class="tok-num">1</span>] - k.P[<span class="tok-num">0</span>][<span class="tok-num">1</span>] - k.P[<span class="tok-num">1</span>][<span class="tok-num">0</span>] + k.Q_theta);
+  k.P[<span class="tok-num">0</span>][<span class="tok-num">1</span>] -= dt * k.P[<span class="tok-num">1</span>][<span class="tok-num">1</span>];
+  k.P[<span class="tok-num">1</span>][<span class="tok-num">0</span>] -= dt * k.P[<span class="tok-num">1</span>][<span class="tok-num">1</span>];
+  k.P[<span class="tok-num">1</span>][<span class="tok-num">1</span>] += k.Q_bias * dt;
+
+  <span class="tok-c">// --- Correccion (H = [1, 0], medida escalar) ---</span>
+  <span class="tok-kw">float</span> S = k.P[<span class="tok-num">0</span>][<span class="tok-num">0</span>] + k.R_measure;
+  <span class="tok-kw">float</span> K0 = k.P[<span class="tok-num">0</span>][<span class="tok-num">0</span>] / S;
+  <span class="tok-kw">float</span> K1 = k.P[<span class="tok-num">1</span>][<span class="tok-num">0</span>] / S;
+
+  <span class="tok-kw">float</span> y = accelAngle - k.theta;   <span class="tok-c">// innovacion</span>
+  k.theta += K0 * y;
+  k.bias  += K1 * y;
+
+  <span class="tok-kw">float</span> P00 = k.P[<span class="tok-num">0</span>][<span class="tok-num">0</span>], P01 = k.P[<span class="tok-num">0</span>][<span class="tok-num">1</span>];
+  k.P[<span class="tok-num">0</span>][<span class="tok-num">0</span>] -= K0 * P00;
+  k.P[<span class="tok-num">0</span>][<span class="tok-num">1</span>] -= K0 * P01;
+  k.P[<span class="tok-num">1</span>][<span class="tok-num">0</span>] -= K1 * P00;
+  k.P[<span class="tok-num">1</span>][<span class="tok-num">1</span>] -= K1 * P01;
+
+  <span class="tok-kw">return</span> k.theta;
+}</code></pre>
+
+      <p>Este es, deliberadamente, un Kalman "desenrollado a mano" para 2×2 —sin librería de álgebra matricial—,
+      el patrón estándar en implementaciones embebidas de este filtro para robots de balance, donde el estado es
+      chico y fijo y no se justifica el costo de una librería genérica.</p>
+
+      <div class="table-wrap">
+        <table>
+          <caption>Complementario vs. Kalman</caption>
+          <thead><tr><th>Aspecto</th><th>Complementario</th><th>Kalman</th></tr></thead>
+          <tbody>
+            <tr><td>Parámetros libres</td><td>1 (\(\alpha\) o \(\tau\))</td><td>3 (\(Q_\theta,Q_\beta,R\))</td></tr>
+            <tr><td>Modela el bias</td><td>No explícitamente (se resta antes)</td><td>Sí, como estado estimado</td></tr>
+            <tr><td>Ponderación</td><td>Fija</td><td>Adaptativa vía \(P[k]\)</td></tr>
+            <tr><td>Costo computacional</td><td>Muy bajo</td><td>Bajo (2 estados) pero mayor</td></tr>
+            <tr><td>Facilidad de sintonía</td><td>Alta (un número)</td><td>Media (requiere entender Q/R)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ §3 ============================================================ -->
+    <section class="doc-section" id="s3">
+      <div class="sec-head"><span class="sec-num">§3</span><h2>Teoría del control PID en profundidad</h2></div>
+
+      <h3><span class="sub-n">3.1</span>Significado físico de cada término</h3>
+      <p>Con \(e(t)=\theta_\text{ref}-\hat\theta(t)\) (aquí casi siempre \(\theta_\text{ref}=0\)):</p>
+      <div class="eq-block">\[
+      u(t) = \underbrace{K_p\,e(t)}_{\text{rigidez}} + \underbrace{K_i\int_0^t e(\tau)\,d\tau}_{\text{memoria}} + \underbrace{K_d\,\dot e(t)}_{\text{amortiguamiento}}
+      \]</div>
+      <p><b>P</b> actúa como un resorte virtual: cuanto más inclinado, más fuerte empuja de vuelta, proporcional al
+      error actual. <b>I</b> es memoria: acumula el error pasado y sigue empujando mientras quede algún error
+      sostenido, eliminando el error estacionario que P solo no puede (un resorte ideal, sin fricción, se asienta
+      con desviación residual si hay una carga constante que vencer). <b>D</b> anticipa: reacciona a la
+      <em>velocidad</em> del error, frenando el movimiento antes de que llegue al punto de equilibrio, como un
+      amortiguador.</p>
+
+      <h3><span class="sub-n">3.2</span>Forma discreta</h3>
+      <p>Con período de muestreo \(\Delta t\), la forma "posicional" (calcula \(u\) completo cada vez) es la
+      discretización directa de la integral y la derivada:</p>
+      <div class="eq-block">\[
+      u[k] = K_p\,e[k] + K_i\,\Delta t\sum_{j=0}^{k} e[j] + K_d\,\frac{e[k]-e[k-1]}{\Delta t}
+      \]</div>
+      <p>Existe también la forma "de velocidad" o incremental, que calcula \(\Delta u[k]=u[k]-u[k-1]\) en vez de
+      \(u[k]\) directamente — útil porque evita saltos bruscos al cambiar de modo de operación (por ejemplo, al
+      pasar de lazo abierto a cerrado), ya que no depende de reconstruir el historial completo de \(e\).</p>
+
+      <h3><span class="sub-n">3.3</span>Patologías clásicas</h3>
+
+      <h4>Golpe derivativo (<em>derivative kick</em>)</h4>
+      <p>Si el punto de referencia cambia de forma abrupta, \(e[k]-e[k-1]\) da un salto artificial que el término
+      derivativo amplifica por \(K_d/\Delta t\) — un pico de control que no refleja nada físico, solo el cambio de
+      referencia. La solución estándar es derivar sobre la <b>medida</b>, no sobre el error:</p>
+      <div class="eq-block">\[
+      D[k] = -K_d\,\frac{\hat\theta[k]-\hat\theta[k-1]}{\Delta t}
+      \]</div>
+      <p>En este robot la referencia de ángulo es casi siempre \(0\) y rara vez cambia bruscamente, así que el
+      golpe derivativo es menos crítico que en, por ejemplo, un lazo de temperatura con cambios de setpoint
+      frecuentes — pero implementarlo correctamente de entrada cuesta lo mismo y evita sorpresas si más adelante
+      se inyecta una referencia de ángulo pequeña desde un lazo de posición.</p>
+
+      <h4>Derivada filtrada</h4>
+      <p>La derivada pura amplifica ruido de alta frecuencia — cualquier salto entre dos muestras, real o no, se
+      multiplica por \(1/\Delta t\), que a 200 Hz es un factor de 200. La forma estándar en implementaciones
+      industriales es pasar el término derivativo por un filtro pasa-bajos de primer orden, parametrizado por una
+      constante \(N\) (típicamente entre 8 y 20):</p>
+      <div class="eq-block">\[
+      D_f[k] = D_f[k-1] + \frac{\Delta t}{\Delta t + 1/N}\big(D[k]-D_f[k-1]\big)
+      \]</div>
+      <p>\(N\) grande deja pasar más ruido pero responde más rápido; \(N\) chico filtra más pero introduce retardo
+      de fase adicional — otro compromiso, no una elección libre de costo.</p>
+
+      <h4>Windup del integrador y <em>back-calculation</em></h4>
+      <p>Cuando el actuador satura —en este robot, el PWM tiene un tope duro de <b>121/255</b>, calculado para no
+      superar los 6 V nominales del motor (JGB37-520B, 793RPM) con la batería a plena carga—, el error puede
+      seguir siendo distinto de
+      cero aunque el actuador ya no pueda responder más. El integrador sigue sumando ese error igual, y cuando la
+      condición que causó la saturación termina, hay que "des-sumar" todo ese exceso antes de que el controlador
+      vuelva a responder normalmente — produciendo sobreimpulsos grandes e innecesarios.</p>
+      <p><b>Back-calculation</b>: en vez de dejar que el integrador acumule libremente, se le resta un término
+      proporcional al exceso de saturación, con una ganancia de recuperación \(K_b\):</p>
+      <div class="eq-block">\[
+      I[k] = I[k-1] + K_i\,e[k]\,\Delta t + K_b\big(u_\text{sat}[k-1]-u_\text{unsat}[k-1]\big)
+      \]</div>
+      <p>Mientras el actuador no satura, \(u_\text{sat}=u_\text{unsat}\) y el término extra es cero — el
+      integrador funciona normal. En cuanto satura, el término empuja al integrador hacia el valor que
+      <em>sí</em> sería consistente con el límite real del actuador, en vez de seguir inflándose sin sentido.</p>
+
+      <h4>Zona muerta del actuador</h4>
+      <p>Por debajo de cierto duty, el motor recibe tensión pero no vence su propia fricción estática — no gira.
+      Es una no linealidad dura que ningún PID lineal compensa por sí solo: si el controlador pide un esfuerzo
+      pequeño (que es exactamente lo que pide cerca del equilibrio, donde el error es chico), esa orden puede caer
+      dentro de la zona muerta y no producir ningún movimiento real, aunque el cálculo del PID sea correcto.</p>
+      <div class="callout-real">
+        <span class="note-label">Dato real de este proyecto</span>
+        <p>La zona muerta bajo carga real (robot en el piso, no en el aire) se midió en <b>~duty 77/255</b> —
+        equivalente a unos 3.8 V promedio. Muy por debajo de eso el robot simplemente no respondía. La
+        compensación estándar es una pre-distorsión: si el PID pide \(0&lt;|u|&lt;u_\text{zm}\), se reemplaza por
+        \(\text{sign}(u)\cdot u_\text{zm}\), de forma que cualquier esfuerzo no nulo salte directo por encima del
+        umbral de arranque real. M1 y M2 no se midieron por separado en esa corrida, así que en rigor la
+        compensación debería tener dos umbrales, uno por motor, hasta confirmar si de verdad coinciden.</p>
+      </div>
+
+      <h3><span class="sub-n">3.4</span>Estructura en cascada, y por qué se pospone</h3>
+      <p>El diseño natural para controlar también la <em>posición</em> \(x\) del robot es una cascada: un lazo
+      externo lento compara \(x\) contra una referencia y genera un ángulo de referencia pequeño
+      \(\theta_\text{ref}\) (inclinarse levemente hacia adelante para acelerar hacia adelante), que alimenta el
+      lazo interno de ángulo ya descrito, mucho más rápido. Se pospone deliberadamente aquí por dos razones
+      independientes ya establecidas: el lazo interno tiene que ser sólido y confiable antes de que valga la pena
+      construir algo encima —un lazo externo amplifica cualquier debilidad del interno—, y el banco de pruebas
+      actual, con el arnés de <a href="#s0">§0</a>, no permite validar honestamente desplazamientos \(x\) más
+      allá de ~20 cm del anclaje. No hay manera responsable de sintonizar el lazo externo todavía.</p>
+
+      <h3><span class="sub-n">3.5</span>Estabilidad: Routh–Hurwitz sobre la planta linealizada</h3>
+      <p>Retomando el modelo de <a href="#s1">§1</a>, \(\ddot\theta=\omega_0^2\theta-bu\), con un PID completo
+      \(u=K_p\theta+K_d\dot\theta+K_i\sigma\) (\(\dot\sigma=\theta\), el estado integral) y con la convención de
+      signos en que un duty positivo acelera las ruedas en el sentido que reduce \(|\theta|\), sustituir da:</p>
+      <div class="eq-block">\[
+      \dddot\theta \;\text{—en forma de estado, el polinomio característico del lazo cerrado es—}\quad
+      s^3 + bK_d\,s^2 + (bK_p-\omega_0^2)\,s + bK_i = 0
+      \]</div>
+      <p>Para un polinomio cúbico \(s^3+a_2s^2+a_1s+a_0\), el criterio de Routh–Hurwitz da condiciones necesarias
+      y suficientes de estabilidad: \(a_2>0\), \(a_1>0\), \(a_0>0\), y \(a_2a_1>a_0\). Aplicadas aquí:</p>
+      <div class="eq-block">\[
+      K_d>0,\qquad K_i>0,\qquad K_p>\frac{\omega_0^2}{b},\qquad K_d\Big(K_p-\frac{\omega_0^2}{b}\Big)>K_i
+      \]</div>
+      <p>La tercera condición es la más reveladora: <b>hay un umbral mínimo de \(K_p\)</b>, \(K_p^\text{min}=\omega_0^2/b\),
+      por debajo del cual <em>ningún</em> valor de \(K_d\) o \(K_i\) puede estabilizar el sistema. No es una regla
+      empírica de sintonía — sale directamente del álgebra. \(b=ml/I_p\) depende de la ganancia real motor-rueda
+      (cuánta aceleración de base produce una unidad de esfuerzo de control), que no está medida todavía en este
+      proyecto — se deja como parámetro libre a estimar experimentalmente antes de intentar predecir \(K_p^\text{min}\)
+      con un número concreto, en vez de inventarlo.</p>
+
+      <div class="note intuition">
+        <span class="note-label">Intuición</span>
+        <p>\(K_p\) tiene que "ganarle" a la gravedad antes de que valga la pena hablar de \(K_i\) o \(K_d\) — un
+        resorte demasiado blando no sostiene nada, sin importar cuánto amortiguamiento o memoria se le agregue
+        encima.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ §4 ============================================================ -->
+    <section class="doc-section" id="s4">
+      <div class="sec-head"><span class="sec-num">§4</span><h2>Métodos estándar de sintonía</h2></div>
+
+      <h3><span class="sub-n">4.1</span>Ziegler–Nichols de lazo cerrado (ganancia crítica)</h3>
+      <p>Procedimiento clásico (1942): con \(K_i=K_d=0\), subir \(K_p\) gradualmente hasta que el sistema oscile
+      con amplitud sostenida —ni crece ni decae—. Ese valor es la ganancia crítica \(K_u\); el período de esa
+      oscilación es \(T_u\). Con ambos, la tabla original da:</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Ziegler–Nichols, lazo cerrado</caption>
+          <thead><tr><th>Controlador</th><th>\(K_p\)</th><th>\(T_i\)</th><th>\(T_d\)</th></tr></thead>
+          <tbody>
+            <tr><td>P</td><td>\(0.50\,K_u\)</td><td>—</td><td>—</td></tr>
+            <tr><td>PI</td><td>\(0.45\,K_u\)</td><td>\(T_u/1.2\)</td><td>—</td></tr>
+            <tr><td>PID clásico</td><td>\(0.60\,K_u\)</td><td>\(T_u/2\)</td><td>\(T_u/8\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>(\(K_i=K_p/T_i\), \(K_d=K_p T_d\) para convertir a la forma paralela usada en <a href="#s3">§3</a>.)</p>
+
+      <div class="callout-warn">
+        <span class="note-label">Por qué es arriesgado aplicarlo tal cual aquí</span>
+        <p>Z-N clásico apunta deliberadamente al borde de la oscilación sostenida, y su receta original tiende a
+        dar ~25% de sobreimpulso — aceptable en un proceso industrial lento (temperatura, nivel de tanque), pero
+        peligroso en un péndulo invertido real con un límite de caída a 30°: llevar el sistema a oscilación
+        sostenida a propósito, en hardware físico, arriesga que la oscilación crezca más rápido de lo que da
+        tiempo a medir \(T_u\) con precisión antes de que el arnés tenga que intervenir. Existen variantes "con
+        menos sobreimpulso" de la tabla (p. ej. \(K_p=0.33K_u\)) más razonables como punto de partida aquí.</p>
+      </div>
+
+      <h3><span class="sub-n">4.2</span>Realimentación por relé (Åström–Hägglund)</h3>
+      <p>Alternativa mucho más segura para plantas inestables u oscilatorias: en vez de subir \(K_p\) a ciegas, se
+      reemplaza temporalmente el controlador por un relé de amplitud fija y pequeña \(d\) (con una pequeña
+      histéresis para no reaccionar al ruido de medición): \(u=+d\) si \(e>0\), \(u=-d\) si \(e<0\). Esto induce
+      automáticamente un ciclo límite —una oscilación de amplitud acotada <em>por diseño</em>, porque \(d\) se
+      elige chico de antemano— sin necesidad de acercarse a ningún límite desconocido.</p>
+      <p>Se mide, del ciclo límite resultante, el período \(T_u\) y la amplitud de oscilación de la salida \(a\).
+      Por análisis de descripción de función (el primer armónico de una onda cuadrada de amplitud \(d\) tiene
+      magnitud \(4d/\pi\)), la ganancia última se estima como:</p>
+      <div class="eq-block">\[
+      K_u \approx \frac{4d}{\pi a}
+      \]</div>
+      <p>y de ahí se aplican las mismas fórmulas de la tabla anterior. La ventaja concreta para este robot: el
+      relé se implementa trivialmente reemplazando el cálculo de \(u\) del PID por la lógica bang-bang durante la
+      rutina de sintonía, con \(d\) fijado deliberadamente chico (por ejemplo, equivalente a duty=30 — muy por
+      debajo del cap de seguridad de 121) — oscilaciones pequeñas y controladas, apropiadas para un arnés que solo
+      debería intervenir cerca de 30°, no en cada intento de sintonía.</p>
+
+      <h3><span class="sub-n">4.3</span>Procedimiento manual estructurado</h3>
+      <p>Como alternativa o complemento, con criterios de parada objetivos en cada paso:</p>
+      <ol>
+        <li>Con \(K_i=K_d=0\), subir \(K_p\) hasta ver 2–3 oscilaciones visibles de baja amplitud tras una
+        perturbación manual leve; retroceder a ~60–70% de ese valor.</li>
+        <li>Agregar \(K_d\) gradualmente hasta que las oscilaciones se amorticen en menos de 1 ciclo visible tras
+        la misma perturbación de referencia, sin agregar temblor audible del motor (señal de derivada sin
+        filtrar amplificando ruido).</li>
+        <li>Agregar el mínimo \(K_i\) necesario para que el robot no quede con una inclinación residual sostenida,
+        vigilando que no reintroduzca oscilación de baja frecuencia (típico del windup si no hay
+        back-calculation activo).</li>
+      </ol>
+    </section>
+
+    <!-- ============================================================ §5 ============================================================ -->
+    <section class="doc-section" id="s5">
+      <div class="sec-head"><span class="sec-num">§5</span><h2>Función de costo / fitness</h2></div>
+
+      <h3><span class="sub-n">5.1</span>Índices integrales clásicos</h3>
+      <div class="table-wrap">
+        <table>
+          <caption>Índices de error integral</caption>
+          <thead><tr><th>Índice</th><th>Definición</th><th>Efecto</th></tr></thead>
+          <tbody>
+            <tr><td>IAE</td><td>\(\int|e(t)|\,dt\)</td><td>Lineal, robusto, no distingue errores grandes de chicos con énfasis.</td></tr>
+            <tr><td>ISE</td><td>\(\int e(t)^2\,dt\)</td><td>Penaliza fuerte los errores grandes; tiende a respuestas agresivas.</td></tr>
+            <tr><td>ITAE</td><td>\(\int t\,|e(t)|\,dt\)</td><td>Pesa el tiempo: castiga error <em>persistente</em> mucho más que el pico inicial inevitable.</td></tr>
+            <tr><td>ITSE</td><td>\(\int t\,e(t)^2\,dt\)</td><td>Combina ambos efectos.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Para un péndulo invertido, cualquier perturbación produce inevitablemente un error inicial grande y
+      breve — eso no es indicativo de mala sintonía. <b>ITAE</b> es la elección razonada aquí precisamente porque
+      no castiga desproporcionadamente esa fase inicial, mientras sí penaliza fuerte cualquier error que persista
+      en el tiempo, que sí es una señal confiable de mala sintonía (asentamiento lento, oscilación residual). Es,
+      además, el índice más citado en la literatura de sintonía automática para plantas oscilatorias.</p>
+
+      <h3><span class="sub-n">5.2</span>Costo compuesto</h3>
+      <p>Un fitness que solo mire el error de ángulo puede premiar controladores que "ganan" a costa de esfuerzo
+      de control excesivo, cambios bruscos de duty (desgaste mecánico y eléctrico), o que se acercan peligrosamente
+      al límite de caída. Un costo compuesto razonable:</p>
+      <div class="eq-block">\[
+      J = w_1\cdot\text{ITAE}(\theta) \;+\; w_2\int u(t)^2\,dt \;+\; w_3\int|\Delta u(t)|\,dt \;+\; w_4\cdot P_\text{caída}
+      \]</div>
+      <p>donde \(\int u^2dt\) penaliza esfuerzo/energía, \(\int|\Delta u|dt\) penaliza <em>chattering</em> (cambios
+      bruscos consecutivos de duty, que desgastan mecánicamente el driver y los motores), y \(P_\text{caída}\) es
+      una penalización grande y fija si \(|\theta|\) supera el límite de seguridad o si el arnés llega a tensarse
+      durante la corrida — un evento de falla que debe descalificar duramente esa configuración de ganancias, para
+      que el optimizador de <a href="#s6">§6</a> aprenda a evitar esa región del espacio de búsqueda.</p>
+
+      <div class="callout-warn">
+        <span class="note-label">Un detalle que se pasa por alto seguido</span>
+        <p>ITAE, energía y chattering viven en escalas numéricas completamente distintas. Sumarlos con pesos
+        \(w_i\) sin antes <b>normalizar cada término</b> por su rango típico observado hace que el término de
+        mayor magnitud absoluta domine el costo total, sin importar qué tan cuidadosamente se elijan los pesos —
+        un error común en implementaciones apuradas de PID+PSO.</p>
+      </div>
+
+      <h3><span class="sub-n">5.3</span>Arquitectura "dos programas, un solo fitness"</h3>
+      <p>El plan de trabajo pide dos firmwares separados: uno con ganancias fijas (línea base, fruto de
+      <a href="#s4">§4</a>) que reporta \(J\), y otro que ajusta las ganancias vía PSO usando el mismo \(J\), para
+      poder comparar de forma justa cuánto mejora el ajuste automático sobre el manual. Esa comparación solo es
+      válida si <b>el cálculo de \(J\) es exactamente el mismo código</b> en ambos programas — no una
+      reimplementación paralela que "debería" calcular lo mismo.</p>
+      <p>La razón no es estética: una diferencia sutil de implementación (orden de integración, ventana de tiempo
+      distinta, redondeo) haría que cualquier "PSO mejora un X%" fuera, potencialmente, un artefacto de que las dos
+      implementaciones del fitness no son idénticas — no una mejora real del control. La forma concreta de
+      garantizarlo en firmware: un módulo único (por ejemplo <code>fitness.h</code>/<code>fitness.cpp</code>)
+      compilado e incluido igual en ambos binarios, de forma que cualquier cambio al criterio de costo se propague
+      automáticamente a los dos, o directamente rompa la compilación de ambos si hay una incompatibilidad — la
+      sincronización queda forzada por construcción, no por disciplina manual de mantener dos copias iguales.</p>
+    </section>
+
+    <!-- ============================================================ §6 ============================================================ -->
+    <section class="doc-section" id="s6">
+      <div class="sec-head"><span class="sec-num">§6</span><h2>Teoría de Particle Swarm Optimization</h2></div>
+
+      <h3><span class="sub-n">6.1</span>Origen y ecuación fundamental</h3>
+      <p>Kennedy y Eberhart lo propusieron en 1995, inspirados en el comportamiento social de bandadas de aves
+      buscando comida: cada individuo ajusta su trayectoria combinando su propia experiencia con la información
+      compartida del grupo, sin un líder central ni conocimiento del gradiente de la función que se optimiza. Cada
+      "partícula" \(i\) es un candidato en el espacio de búsqueda —aquí, un vector \(x_i=[K_p,K_i,K_d]\in\mathbb{R}^3\)—
+      con una posición y una velocidad que se actualizan en cada iteración:</p>
+      <div class="eq-block">\[
+      v_i[k+1] = w\,v_i[k] + c_1 r_1\big(p_i-x_i[k]\big) + c_2 r_2\big(g-x_i[k]\big), \qquad x_i[k+1]=x_i[k]+v_i[k+1]
+      \]</div>
+      <p>con \(p_i\) el mejor punto que <em>esa</em> partícula visitó (memoria individual), \(g\) el mejor punto
+      visitado por todo el enjambre (o su vecindad, ver 6.4), y \(r_1,r_2\sim U(0,1)\) independientes por
+      dimensión y por iteración, que inyectan la estocasticidad necesaria para que las partículas no converjan por
+      trayectorias idénticas y predecibles.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Rol de cada término</caption>
+          <thead><tr><th>Término</th><th>Nombre</th><th>Efecto</th></tr></thead>
+          <tbody>
+            <tr><td>\(w\,v_i[k]\)</td><td>Inercia</td><td>Mantiene la dirección previa; \(w\) alto = más exploración/momento.</td></tr>
+            <tr><td>\(c_1r_1(p_i-x_i)\)</td><td>Cognitivo</td><td>Atracción hacia la mejor experiencia propia — "nostalgia".</td></tr>
+            <tr><td>\(c_2r_2(g-x_i)\)</td><td>Social</td><td>Atracción hacia lo mejor encontrado por el grupo.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3><span class="sub-n">6.2</span>El factor de constricción de Clerc–Kennedy</h3>
+      <p>El PSO original, sin más ajuste, puede divergir: para ciertas combinaciones de \(w,c_1,c_2\) la varianza
+      de la trayectoria de una partícula crece sin cota. Clerc y Kennedy (2002) analizaron la dinámica de una sola
+      partícula —colapsando el término cognitivo y social en un único punto de atracción efectivo, técnica
+      estándar en este tipo de análisis— como un sistema lineal discreto de segundo orden. Con
+      \(\bar\varphi=c_1+c_2\), la recurrencia de la posición tiene el polinomio característico:</p>
+      <div class="eq-block">\[
+      \lambda^2 - (1+w-\bar\varphi)\lambda + w = 0
+      \]</div>
+      <p>Exigir que ambas raíces queden dentro del círculo unitario (criterio de Jury, el análogo discreto de
+      Routh–Hurwitz) acota los valores admisibles de \(w\) y \(\bar\varphi\). Resolviendo esa condición para el
+      caso \(\bar\varphi>4\), Clerc y Kennedy obtienen un <b>factor de constricción</b> \(\chi\) que, multiplicando
+      toda la actualización de velocidad (no solo el término de inercia), garantiza convergencia:</p>
+      <div class="eq-block">\[
+      \chi = \frac{2}{\big|2-\varphi-\sqrt{\varphi^2-4\varphi}\big|}, \qquad \varphi=c_1+c_2>4
+      \]</div>
+      <div class="note intuition">
+        <span class="note-label">Sobre el nivel de detalle</span>
+        <p>Se omite el desarrollo algebraico completo de cómo se llega a esa fórmula cerrada —es largo— y se
+        presenta el resultado con su condición de aplicación y su origen conceptual (estabilidad de un sistema
+        lineal de segundo orden), que es lo que hace falta para usarlo con criterio.</p>
+      </div>
+      <p>Con la elección canónica \(\varphi=4.1\) (típicamente \(c_1=c_2=2.05\)), \(\chi\approx0.7298\). Esta
+      formulación de "constricción" y la más común de "peso de inercia decreciente" (\(w\) bajando linealmente de
+      ~0.9 a ~0.4 durante la corrida, con \(c_1=c_2\approx2\) fijos) están algebraicamente emparentadas y son las
+      dos variantes canónicas más usadas en la práctica.</p>
+
+      <h3><span class="sub-n">6.3</span>Exploración vs. explotación</h3>
+      <p>\(w\) alto favorece exploración (las partículas cubren más espacio antes de comprometerse); \(w\) bajo
+      favorece explotación (convergencia rápida hacia lo mejor conocido, con riesgo real de quedar atrapado en un
+      óptimo local si ese "mejor conocido" no lo es globalmente). La estrategia más común —decrecer \(w\)
+      linealmente durante la corrida— es, en esencia, empezar explorando y terminar explotando, sin tener que
+      decidir de antemano cuál de los dos regímenes es "correcto".</p>
+
+      <h3><span class="sub-n">6.4</span>Topología: gbest vs. lbest</h3>
+      <p><b>gbest</b>: todas las partículas ven al mejor de <em>todo</em> el enjambre — converge más rápido, pero
+      es más propenso a quedar atrapado en óptimos locales si el mejor global temprano resulta engañoso.
+      <b>lbest</b> (anillo o vecindad): cada partícula solo ve al mejor de un subconjunto vecino — converge más
+      lento pero es más robusto en superficies de costo multimodales.</p>
+      <div class="callout-warn">
+        <span class="note-label">Elección para este proyecto, con el trade-off explícito</span>
+        <p>Cada evaluación de fitness aquí implica correr un episodio físico completo de varios segundos en
+        hardware real — no es una función analítica gratis de evaluar miles de veces como en simulación. Eso
+        empuja a enjambres <b>pequeños</b> (6–10 partículas, no las 20–50 típicas en literatura de simulación) y a
+        topología <b>gbest</b> simple, priorizando converger con menos evaluaciones totales por sobre la robustez
+        extra de lbest — una decisión de costo experimental, no de preferencia algorítmica abstracta.</p>
+      </div>
+
+      <h3><span class="sub-n">6.5</span>Manejo de fronteras</h3>
+      <p>El espacio de búsqueda debe acotarse a rangos físicamente sensatos de \([K_p,K_i,K_d]\) —por ejemplo, un
+      rango de ±50–100% alrededor del resultado de <a href="#s4">§4</a>—. Si una partícula sale de ese rango,
+      las estrategias estándar son <em>reflejar</em> (rebotar la velocidad), <em>absorber</em> (fijar la posición
+      al límite y anular la velocidad en esa dimensión), o reinicio aleatorio dentro del rango. Aquí conviene
+      <b>absorber con velocidad amortiguada</b>: cruzar el límite superior de \(K_p\) o \(K_d\) en este robot no es
+      un evento abstracto — significa probar, en hardware físico real, ganancias que ya se consideraron
+      potencialmente peligrosas al definir el rango. El manejo de fronteras es, aquí, una medida de seguridad
+      tanto como una decisión matemática.</p>
+
+      <h3><span class="sub-n">6.6</span>Funciones de costo ruidosas</h3>
+      <p>Muchas implementaciones de PSO asumen implícitamente que evaluar la misma posición dos veces da el mismo
+      valor de fitness. Eso es falso cuando el fitness se mide en hardware real: ruido de sensor, variación de
+      fricción entre corridas, y una perturbación manual que nunca es exactamente repetible hacen que el mismo
+      \([K_p,K_i,K_d]\) pueda dar valores de \(J\) distintos en corridas sucesivas.</p>
+      <div class="callout-real">
+        <span class="note-label">Fuente concreta de ruido no estacionario en este robot</span>
+        <p>El cap de PWM (121/255) se calculó asumiendo <b>12.6 V fijo</b> como peor caso de una LiPo 3S llena.
+        Durante una sesión larga de PSO, el voltaje real de la batería cae progresivamente por debajo de ese peor
+        caso — el mapeo duty→voltaje real cambia lentamente a lo largo de la sesión sin que el firmware lo sepa.
+        No es que las ganancias mejoren o empeoren: es que la planta cambió sutilmente bajo los pies del
+        optimizador.</p>
+      </div>
+      <p>Mitigaciones estándar: promediar 2–3 evaluaciones por partícula antes de aceptar un fitness (a costa de
+      tiempo experimental proporcional); mantener el \(p_\text{best}\) con cierta tolerancia en vez de reemplazo
+      estricto ante cualquier mejora marginal (para no anclarse en una medición favorablemente ruidosa); y
+      re-evaluar periódicamente el \(g_\text{best}\) para confirmar que sigue siendo, de verdad, el mejor.</p>
+
+      <h3><span class="sub-n">6.7</span>Criterios de parada</h3>
+      <p>Número fijo de iteraciones (predecible en tiempo total de banco, importante cuando cada evaluación cuesta
+      minutos, no milisegundos); falta de mejora del \(g_\text{best}\) durante \(K\) iteraciones seguidas
+      (estancamiento); o, más pragmático dado el costo real de cada corrida, un presupuesto total de tiempo de
+      banco de pruebas fijado de antemano.</p>
+
+      <h3><span class="sub-n">6.8</span>PSO frente a otras alternativas sin gradiente — comparación honesta</h3>
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-eyebrow"><span>Nelder–Mead</span><span>simplex</span></div>
+          <p style="font-size:.92rem;color:#d7d4cb;margin:0 0 .6rem;">Determinista, mantiene un simplex de \(n+1\)
+          puntos (4, para 3 parámetros) y lo deforma —reflexión, expansión, contracción— buscando mejorar el peor
+          vértice.</p>
+          <p style="font-size:.88rem;color:var(--good);margin:0 0 .3rem;">+ Muchas menos evaluaciones por
+          iteración que un enjambre completo — una ventaja real cuando cada evaluación cuesta tiempo de hardware.</p>
+          <p style="font-size:.88rem;color:var(--warn);margin:0;">− Mucho más propenso a atascarse en óptimos
+          locales, y las comparaciones estrictas "mejor/peor" entre vértices son frágiles frente al ruido de
+          medición — sin memoria social que amortigüe una evaluación puntual mala.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-eyebrow"><span>Optimización bayesiana</span><span>proceso gaussiano</span></div>
+          <p style="font-size:.92rem;color:#d7d4cb;margin:0 0 .6rem;">Construye un modelo probabilístico de
+          \(J(K_p,K_i,K_d)\) a partir de lo ya evaluado, y elige el siguiente punto maximizando una función de
+          adquisición (p. ej. mejora esperada).</p>
+          <p style="font-size:.88rem;color:var(--good);margin:0 0 .3rem;">+ Extremadamente eficiente en número de
+          evaluaciones — a menudo converge en 15–30 evaluaciones totales en 3 dimensiones, el recurso más escaso
+          en este banco.</p>
+          <p style="font-size:.88rem;color:var(--warn);margin:0;">− Mucho más complejo de implementar embebido
+          (álgebra de procesos gaussianos, inversión de matrices de covarianza creciente); en la práctica
+          correría mejor en una PC recibiendo telemetría por WiFi, no dentro del ESP8266.</p>
+        </div>
+      </div>
+      <p>Conclusión honesta: si el objetivo fuera minimizar puramente el <em>número</em> de pruebas físicas
+      necesarias, optimización bayesiana probablemente le gana a PSO en eficiencia muestral. PSO se justifica en
+      este proyecto por tres razones concretas y no por ser "el más popular": cabe entero en el ESP8266 sin
+      dependencias numéricas pesadas, tolera razonablemente el ruido de medición gracias a su memoria acumulada de
+      \(p_\text{best}\)/\(g_\text{best}\) —a diferencia de Nelder-Mead, que depende de comparaciones puntuales—, y
+      tiene un paralelismo conceptual natural si en el futuro hubiera más de un robot idéntico evaluando
+      partículas distintas en simultáneo (no es el caso hoy, pero es una ventaja estructural real del algoritmo,
+      no hipotética).</p>
+    </section>
+
+    <!-- ============================================================ §7 ============================================================ -->
+    <section class="doc-section" id="s7">
+      <div class="sec-head"><span class="sec-num">§7</span><h2>Arquitectura de firmware concreta</h2></div>
+
+      <h3><span class="sub-n">7.1</span>El lazo de control no puede vivir en un <code>loop()</code> bloqueante</h3>
+      <p>El ESP8266 tiene un solo núcleo, y su stack de WiFi (parte del SDK subyacente, no de la lógica de la
+      aplicación) necesita que se le ceda tiempo de CPU periódicamente mediante llamadas internas de "fondo". Si el
+      <code>loop()</code> principal se queda bloqueado demasiado tiempo (por ejemplo con <code>delay()</code>
+      largos dentro del propio lazo de control), el watchdog interno del SDK puede resetear el chip — y aún sin
+      llegar a ese extremo, un <code>delay()</code> cuya duración real varía según qué esté haciendo el stack de
+      WiFi en ese instante introduce <em>jitter</em> en el período de muestreo, y un PID discreto asume
+      implícitamente un \(\Delta t\) aproximadamente constante.</p>
+
+      <p>La solución estándar: un <b>timer de hardware</b> (en el core Arduino de ESP8266, la librería
+      <code>Ticker</code> o el timer1 de bajo nivel) que dispara a una tasa fija e independiente de lo que haga el
+      resto del programa. Dentro de la interrupción, el patrón más seguro no es hacer todo el trabajo pesado ahí
+      mismo —leer I²C dentro de una ISR es delicado, puede competir con otras interrupciones o tardar más que el
+      margen disponible—, sino simplemente levantar una bandera; el trabajo real (leer IMU, fusionar, calcular
+      PID) se hace en el <code>loop()</code> principal, al inicio de cada vuelta, si la bandera está activa.</p>
+
+      <pre><code><span class="tok-c">// Patron recomendado: ISR minima + bandera + trabajo diferido en loop()</span>
+<span class="tok-kw">#include</span> &lt;Ticker.h&gt;
+Ticker controlTimer;
+<span class="tok-kw">volatile bool</span> controlTick = <span class="tok-kw">false</span>;
+
+<span class="tok-kw">void</span> IRAM_ATTR <span class="tok-fn">onControlTimer</span>() {
+  controlTick = <span class="tok-kw">true</span>;  <span class="tok-c">// nada mas: nada de I2C, nada de calculo pesado aqui</span>
+}
+
+<span class="tok-kw">void</span> <span class="tok-fn">setup</span>() {
+  <span class="tok-c">// 200 Hz -> 5000 us</span>
+  controlTimer.<span class="tok-fn">attach_ms</span>(<span class="tok-num">5</span>, <span class="tok-fn">onControlTimer</span>);
+}
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {
+  <span class="tok-kw">if</span> (controlTick) {
+    controlTick = <span class="tok-kw">false</span>;
+    <span class="tok-fn">runControlStep</span>();      <span class="tok-c">// IMU + fusion + PID + envio UART, aqui si</span>
+  }
+  server.<span class="tok-fn">handleClient</span>();   <span class="tok-c">// WiFi / dashboard, sin bloquear</span>
+}</code></pre>
+
+      <h3><span class="sub-n">7.2</span>Protocolo UART: dos canales sobre un enlace</h3>
+      <p>Un canal de <b>texto</b> de baja tasa, legible para debug humano (líneas ASCII cada varios cientos de
+      ms), conviviendo con un <b>frame binario</b> compacto para la orden de PWM, enviado a la tasa completa del
+      lazo de control. El Nano es deliberadamente "tonto": no debería tener que parsear texto con algo como
+      <code>sscanf</code> a 200 Hz —más caro computacionalmente y con jitter propio—, así que la orden de control
+      va en un frame binario de tamaño fijo:</p>
+
+      <div class="table-wrap">
+        <table>
+          <caption>Frame binario de orden de PWM — 5 bytes</caption>
+          <thead><tr><th>Byte</th><th>Contenido</th></tr></thead>
+          <tbody>
+            <tr><td>0</td><td><code>0xAA</code> — byte de sincronismo</td></tr>
+            <tr><td>1</td><td>banderas de dirección (bit7=M1, bit6=M2, resto reservado)</td></tr>
+            <tr><td>2</td><td>duty motor 1 (uint8, 0–121)</td></tr>
+            <tr><td>3</td><td>duty motor 2 (uint8, 0–121)</td></tr>
+            <tr><td>4</td><td>checksum (XOR de los bytes 1–3)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>5 bytes a 200 Hz son 1000 bytes/s de datos útiles — cómodo incluso a 57600 baudios, con margen de sobra
+      para intercalar el canal de texto. El checksum simple (XOR) alcanza para que el Nano descarte un frame
+      corrupto sin necesitar un CRC más pesado de calcular en un microcontrolador de 8 bits.</p>
+
+      <div class="callout-warn">
+        <span class="note-label">El protocolo no sirve de nada si daña al ESP8266 primero</span>
+        <p>Hay un problema eléctrico previo a cualquier frame: el Nano corre su lógica a 5V, y su pin TX saca un
+        "1" a ~5V. El ESP8266 opera a 3.3V y <b>sus GPIO no toleran 5V</b> — es un límite del silicio, no de la
+        alimentación (que sí puede compartirse: ambos chips tomando 5V del mismo riel lógico no es el problema).
+        Meter 5V directo al RX del ESP8266 puede dañarlo de forma permanente. La dirección opuesta (ESP TX a
+        3.3V → Nano RX) no necesita nada: 3.3V ya supera el umbral de "1 lógico" de un ATmega328 a 5V, con margen
+        modesto pero suficiente.</p>
+        <p>La solución estándar para la línea Nano TX → ESP RX es un divisor resistivo simple —dos resistencias,
+        sin chip adicional—: \(R_1=1\text{k}\Omega\) entre el TX del Nano y un nodo medio, \(R_2=2\text{k}\Omega\)
+        entre ese nodo y GND, y el RX del ESP8266 conectado al nodo medio.</p>
+        <div class="eq-block">\[
+        V_\text{out} = 5\,\text{V}\times\frac{R_2}{R_1+R_2} = 5\times\frac{2}{3}\approx3.33\,\text{V}
+        \]</div>
+        <p>Dentro del rango seguro del ESP8266 (nominal 3.3V, máximo absoluto ~3.6V). La resistencia \(R_1\) en
+        serie con la línea, junto con la capacitancia parásita del cable, forma un pasa-bajos con constante de
+        tiempo del orden de decenas de nanosegundos — varios órdenes de magnitud menor que un bit a 115200
+        baudios (~8.7 µs), así que no distorsiona la señal a esta velocidad. Esta pieza no está en el inventario
+        del proyecto todavía; hasta que se arme y se verifique con multímetro, el Test 4 (validación del enlace
+        UART) sigue sin correrse — no por falta de diseño, sino porque conectar el Nano TX directo al ESP RX antes
+        de tener el divisor puesto sería exactamente el error que este apartado describe.</p>
+      </div>
+
+      <h3><span class="sub-n">7.3</span>Seguridad: el Nano como última línea de defensa</h3>
+      <p>Que el Nano "no decida nada" no es solo una repartición de carga computacional — es, además, la razón por
+      la que puede actuar como chip de seguridad independiente. Si el ESP8266 se cuelga, se resetea, o
+      simplemente deja de enviar frames (por un bug del stack WiFi, o porque una configuración de ganancias
+      propuesta por PSO hizo que el lazo divergiera tan rápido que el ESP quedó ocupado en otra cosa), el Nano
+      debe notarlo por su cuenta y llevar los motores a parada segura, sin depender de que nadie se lo ordene:</p>
+
+      <pre><code><span class="tok-c">// En el Nano: watchdog de frames UART</span>
+<span class="tok-kw">unsigned long</span> lastFrameMs = <span class="tok-num">0</span>;
+<span class="tok-kw">const unsigned long</span> FRAME_TIMEOUT_MS = <span class="tok-num">100</span>;  <span class="tok-c">// ~20 periodos de lazo a 200 Hz</span>
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {
+  <span class="tok-kw">if</span> (<span class="tok-fn">readValidFrame</span>(&amp;dutyM1, &amp;dutyM2, &amp;dirFlags)) {
+    lastFrameMs = <span class="tok-fn">millis</span>();
+    <span class="tok-c">// segunda linea de defensa: el Nano tambien aplica el cap, no confia ciegamente en el ESP</span>
+    dutyM1 = <span class="tok-fn">constrain</span>(dutyM1, <span class="tok-num">0</span>, <span class="tok-num">121</span>);
+    dutyM2 = <span class="tok-fn">constrain</span>(dutyM2, <span class="tok-num">0</span>, <span class="tok-num">121</span>);
+    <span class="tok-fn">applyMotors</span>(dutyM1, dutyM2, dirFlags);
+  }
+
+  <span class="tok-kw">if</span> (<span class="tok-fn">millis</span>() - lastFrameMs &gt; FRAME_TIMEOUT_MS) {
+    <span class="tok-fn">applyMotors</span>(<span class="tok-num">0</span>, <span class="tok-num">0</span>, <span class="tok-num">0</span>);  <span class="tok-c">// parada segura, sin esperar permiso</span>
+  }
+}</code></pre>
+
+      <p>El cap de PWM aplicado en ambos extremos (ESP al calcular, Nano al ejecutar) es <em>defensa en
+      profundidad</em>, el mismo patrón que ya usa el sketch de prueba de motores de este proyecto real
+      (<code>constrain()</code> dentro de <code>setMotor()</code>, no confiado a que el valor recibido ya venga
+      bien). Adicionalmente, el ESP debería cortar el lazo de control y forzar duty=0 si \(|\hat\theta|\) supera
+      un umbral de seguridad (por ejemplo 25°, con margen antes de los 30° del arnés) — en ese punto, dejar que el
+      arnés físico haga su trabajo es preferible a que el motor siga "luchando" con ganancias potencialmente mal
+      sintonizadas.</p>
+    </section>
+
+    <!-- ============================================================ §8 ============================================================ -->
+    <section class="doc-section" id="s8">
+      <div class="sec-head"><span class="sec-num">§8</span><h2>Protocolo experimental, paso a paso</h2></div>
+
+      <ol>
+        <li><b>Cadena de sensado aislada.</b> Confirmar que el IMU responde por I²C, que la magnitud de aceleración
+        en reposo da ~9.81 m/s² sin importar la orientación, y calibrar bias/escala del acelerómetro por
+        orientaciones conocidas — exactamente el protocolo ya corrido en este proyecto (Test 1/1b), que puede
+        tomarse como plantilla del paso.</li>
+        <li><b>Cadena de actuación aislada.</b> Confirmar PWM y sentido de giro de cada motor, verificar el cap de
+        voltaje aplicado, y medir la zona muerta bajo carga real (con las ruedas en el piso, no en el aire) —
+        también ya corrido en este proyecto (Test 2).</li>
+        <li><b>Filtro de fusión aislado, sin PID todavía.</b> Loguear \(\hat\theta\) fusionado y compararlo contra
+        una referencia aproximada (un inclinómetro o el propio ángulo del acelerómetro en condiciones
+        cuasi-estáticas, donde ambos deberían coincidir). Verificar que no diverge en reposo prolongado y que
+        sigue bien movimientos rápidos impuestos a mano.</li>
+        <li><b>Cierre del lazo con ganancias mínimas.</b> \(K_p\) pequeño, \(K_i=K_d=0\), solo para confirmar el
+        <em>signo</em> de control. Con el arnés puesto y sosteniendo el robot a mano las primeras veces — un signo
+        invertido en un péndulo invertido no falla silenciosamente: acelera la caída en vez de corregirla.</li>
+        <li><b>Sintonía inicial</b> por Z-N/relé (<a href="#s4">§4</a>), con el robot en el arnés, aumentando
+        gradualmente desde ganancias conservadoras.</li>
+        <li><b>Ajuste manual fino</b> según la checklist estructurada de 4.3.</li>
+        <li><b>Línea base de fitness</b> (programa A, <a href="#s5">§5</a>) con la sintonía manual, varias
+        repeticiones — para conocer también la varianza de la medición misma, dato necesario para 6.6.</li>
+        <li><b>Corrida de PSO</b> (programa B), rango de búsqueda acotado alrededor de la sintonía manual,
+        enjambre pequeño, criterio de parada por presupuesto de tiempo o estancamiento.</li>
+        <li><b>Comparación justa</b> PSO vs. línea base — mismo código de fitness, mismas condiciones de episodio,
+        documentando (o promediando sobre) el rango de voltaje real de batería durante la sesión.</li>
+        <li><b>Pruebas de robustez.</b> Perturbaciones de magnitud y dirección no vistas durante la sintonía (para
+        descartar sobreajuste a un único tipo de prueba), y, si es posible, en una superficie distinta a la usada
+        durante el ajuste — recordando que la zona muerta y la fricción cambian con la superficie.</li>
+      </ol>
+    </section>
+
+    <!-- ============================================================ §9 ============================================================ -->
+    <section class="doc-section" id="s9">
+      <div class="sec-head"><span class="sec-num">§9</span><h2>Diagnóstico de fallas comunes</h2></div>
+      <div class="table-wrap">
+        <table class="fail-table">
+          <caption>Síntoma → causa probable → qué revisar</caption>
+          <thead><tr><th>Síntoma</th><th>Causa probable</th><th>Qué revisar</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Oscilación de amplitud creciente, no se estabiliza</td>
+              <td>\(K_p\) demasiado alto para el \(K_d\) actual; o signo de control invertido si es inmediata y violenta</td>
+              <td>Reducir \(K_p\) a la mitad; verificar el signo con una perturbación manual lenta observando el sentido del motor</td>
+            </tr>
+            <tr>
+              <td>\(\hat\theta\) deriva lentamente con el robot quieto y apoyado</td>
+              <td>Bias del giro mal calibrado, o \(Q_\beta\) del Kalman demasiado grande</td>
+              <td>Repetir la calibración de bias en reposo total; revisar \(Q_\beta\)</td>
+            </tr>
+            <tr>
+              <td>Responde a perturbaciones grandes pero no corrige desviaciones chicas cerca de la vertical</td>
+              <td>Zona muerta del actuador sin compensar — el duty pedido cae por debajo del umbral de arranque (~77/255 medido bajo carga)</td>
+              <td>Verificar/implementar la compensación de zona muerta de 3.3; loguear el \(u\) calculado antes y después de compensar</td>
+            </tr>
+            <tr>
+              <td>El motor se satura constantemente y aun así no logra balancear</td>
+              <td>Windup del integrador (arrastre de una fase anterior), o \(K_i\) demasiado alto</td>
+              <td>Verificar que back-calculation esté activo; reducir \(K_i\); loguear P, I, D por separado</td>
+            </tr>
+            <tr>
+              <td>Funciona bien en el banco con arnés pero peor sin él</td>
+              <td>El arnés, aun "flojo", puede aportar un rozamiento residual pequeño en el anclaje que amortigua ligeramente el sistema, enmascarando una sintonía marginalmente subamortiguada</td>
+              <td>Repetir pruebas con la cuerda con la máxima holgura verificable; eventualmente probar sin arnés en superficie blanda antes de dar la sintonía por definitiva</td>
+            </tr>
+            <tr>
+              <td>La cuerda se tensa antes de los ~30° esperados</td>
+              <td>Holgura \(s\) insuficiente para el rango angular real — la longitud extra necesaria crece con \(\theta^2\), así que un error chico en \(r\) o \(h\) medidos desplaza bastante el ángulo real de tensado</td>
+              <td>Remedir \(r\) y \(h\) con cinta métrica; recalcular \(s\) con la fórmula de <a href="#s0">§0</a>; agregar margen y verificar levantando el robot a mano gradualmente</td>
+            </tr>
+            <tr>
+              <td>El Nano deja de responder o los motores quedan erráticos</td>
+              <td>El ESP se reseteó (watchdog del stack WiFi, o brownout de alimentación) y dejó de enviar frames; el watchdog del Nano no está implementado o su timeout es muy largo</td>
+              <td>Implementar/verificar el timeout de frames del Nano (7.3); revisar estabilidad del riel de 5V durante picos de WiFi</td>
+            </tr>
+            <tr>
+              <td>El fitness de PSO "mejora" de forma sospechosamente consistente con el tiempo</td>
+              <td>La batería se descarga durante la sesión larga; el mapeo duty→voltaje real cambia, la planta no es la misma al final que al principio</td>
+              <td>Medir voltaje de batería al inicio y fin de cada sesión; acotar la duración de una corrida de PSO</td>
+            </tr>
+            <tr>
+              <td>Chattering audible del actuador, sin desplazamiento neto</td>
+              <td>Derivada sin filtrar amplificando ruido de alta frecuencia del sensor o del propio chattering mecánico realimentado</td>
+              <td>Verificar el filtro de la derivada (3.3, constante \(N\)); considerar \(R\) más grande en el Kalman si el ruido viene del acelerómetro</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ NOTACIÓN ============================================================ -->
+    <section class="doc-section" id="notacion">
+      <div class="sec-head"><span class="sec-num">§</span><h2>Notación</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Símbolo</th><th>Significado</th></tr></thead>
+          <tbody>
+            <tr><td>\(\theta\)</td><td>Ángulo de pitch respecto de la vertical</td></tr>
+            <tr><td>\(\hat\theta\)</td><td>Estimación fusionada del ángulo</td></tr>
+            <tr><td>\(\beta\)</td><td>Sesgo (bias) del giroscopio, estado del Kalman</td></tr>
+            <tr><td>\(\omega_0\)</td><td>Tasa característica de la inestabilidad, \(\sqrt{mgl/I_p}\)</td></tr>
+            <tr><td>\(K_p,K_i,K_d\)</td><td>Ganancias proporcional, integral y derivativa</td></tr>
+            <tr><td>\(J\)</td><td>Función de costo / fitness compuesto</td></tr>
+            <tr><td>\(w,c_1,c_2\)</td><td>Inercia, coeficiente cognitivo y social del PSO</td></tr>
+            <tr><td>\(\chi\)</td><td>Factor de constricción de Clerc–Kennedy</td></tr>
+            <tr><td>\(r,h,s\)</td><td>Altura de sujeción, altura de anclaje, holgura del arnés</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="colophon">
+      <p>Documento técnico autocontenido — HTML + CSS + MathJax (CDN) + un lienzo de partículas sin dependencias
+      adicionales. Los valores marcados como <span style="color:var(--good)">dato real de este proyecto</span> provienen
+      de mediciones físicas ya realizadas en el banco descrito; el resto son deducciones o estimaciones explícitamente
+      señaladas como tales, no datos de fábrica.</p>
+    </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- scroll-spy para el índice ---------- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  function onScroll(){
+    var pos = window.scrollY + 140;
+    var current = sections[0];
+    for (var i=0;i<sections.length;i++){
+      if (sections[i].offsetTop <= pos) current = sections[i];
+    }
+    links.forEach(function(a){
+      a.classList.toggle('active', a.getAttribute('href') === '#'+current.id);
+    });
+  }
+  document.addEventListener('scroll', onScroll, { passive:true });
+  onScroll();
+
+  /* ---------- animación de partículas: convergencia de enjambre ---------- */
+  var canvas = document.getElementById('swarm');
+  if (!canvas) return;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ctx = canvas.getContext('2d');
+  var W,H,DPR;
+  var particles = [];
+  var N = 46;
+  var target = {x:0.72, y:0.38};
+  var t0 = performance.now();
+
+  function resize(){
+    var rect = canvas.parentElement.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    W = canvas.width  = Math.floor(rect.width*DPR);
+    H = canvas.height = Math.floor(rect.height*DPR);
+    canvas.style.width = rect.width+'px';
+    canvas.style.height = rect.height+'px';
+  }
+  function initParticles(){
+    particles = [];
+    for (var i=0;i<N;i++){
+      particles.push({
+        x: Math.random(), y: Math.random(),
+        vx:(Math.random()-0.5)*0.0009, vy:(Math.random()-0.5)*0.0009,
+        pbx: Math.random(), pby: Math.random(),
+        r: 1.1 + Math.random()*1.6,
+        hue: Math.random() < 0.22 ? 'accent2' : 'accent'
+      });
+    }
+  }
+  resize(); initParticles();
+  window.addEventListener('resize', function(){ resize(); });
+
+  function step(now){
+    var tt = (now - t0)/1000;
+    /* el objetivo (gbest) migra lentamente, como si el enjambre re-explorara */
+    target.x = 0.5 + 0.28*Math.sin(tt*0.05);
+    target.y = 0.42 + 0.16*Math.cos(tt*0.037);
+
+    ctx.clearRect(0,0,W,H);
+
+    /* trazado sutil de líneas hacia el objetivo (gbest) */
+    var gx = target.x*W, gy = target.y*H;
+
+    for (var i=0;i<particles.length;i++){
+      var p = particles[i];
+      var w = 0.86, c1 = 0.0028, c2 = 0.0042;
+      var r1 = Math.sin(i*12.9898+tt)*0.5+0.5;
+      var r2 = Math.cos(i*78.233+tt*0.7)*0.5+0.5;
+
+      p.vx = w*p.vx + c1*r1*(p.pbx-p.x) + c2*r2*(target.x-p.x);
+      p.vy = w*p.vy + c1*r1*(p.pby-p.y) + c2*r2*(target.y-p.y);
+
+      p.x += p.vx; p.y += p.vy;
+      if (p.x<0||p.x>1){ p.vx*=-0.6; p.x=Math.max(0,Math.min(1,p.x)); }
+      if (p.y<0||p.y>1){ p.vy*=-0.6; p.y=Math.max(0,Math.min(1,p.y)); }
+      if (Math.random()<0.01){ p.pbx=p.x; p.pby=p.y; }
+
+      var px=p.x*W, py=p.y*H;
+      var d = Math.hypot(px-gx,py-gy)/W;
+      var alpha = Math.max(0.05, 0.34 - d*0.5);
+
+      ctx.beginPath();
+      ctx.moveTo(px,py); ctx.lineTo(gx,gy);
+      ctx.strokeStyle = 'rgba(217,142,58,'+(alpha*0.35)+')';
+      ctx.lineWidth = 1*DPR;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(px,py,p.r*DPR,0,Math.PI*2);
+      ctx.fillStyle = p.hue==='accent2' ? 'rgba(95,176,171,0.85)' : 'rgba(217,142,58,0.85)';
+      ctx.fill();
+    }
+
+    /* gbest glow */
+    var grad = ctx.createRadialGradient(gx,gy,0,gx,gy,60*DPR);
+    grad.addColorStop(0,'rgba(217,142,58,0.55)');
+    grad.addColorStop(1,'rgba(217,142,58,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(gx,gy,60*DPR,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(gx,gy,3.4*DPR,0,Math.PI*2);
+    ctx.fillStyle = '#f3c987'; ctx.fill();
+
+    if (!reduceMotion) requestAnimationFrame(step);
+  }
+
+  if (reduceMotion){
+    step(t0); /* un solo frame estático */
+  } else {
+    requestAnimationFrame(step);
+  }
+})();
+</script>
+
+</body>
+</html>

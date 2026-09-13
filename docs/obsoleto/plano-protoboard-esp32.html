@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plano — Protoboard ESP32</title>
+<meta name="description" content="Cableado real del protoboard del ESP32 (filas 1-30): mapeo de pines, puentes hacia la zona de conexión, y ubicación de capacitores y resistencias.">
+<style>
+  :root{
+    --bg:#12151c; --bg-panel:#191e28; --bg-inset:#0d0f15;
+    --ink:#e9e6df; --ink-dim:#9aa0ad; --ink-faint:#6b7180;
+    --rule:#2a3040;
+    --used:#4fae63; --used-ink:#0d2013;
+    --bootstrap:#d98e3a;
+    --danger:#d1554a;
+    --inputonly:#5b9fd9;
+    --free:#3a4256;
+    --power:#e0c34a;
+    --bridge:#a17fd6;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:1rem; max-width:920px; margin-inline:auto; line-height:1.5;
+  }
+  h1{font-size:1.25rem; margin:.2rem 0 0;}
+  .sub{color:var(--ink-dim); font-size:.82rem; margin-bottom:1rem;}
+  .note{
+    background:var(--bg-panel); border:1px solid var(--rule); border-left:3px solid var(--bootstrap);
+    border-radius:6px; padding:.8rem 1rem; font-size:.83rem; color:var(--ink-dim); margin-bottom:1.1rem;
+  }
+  .note.confirmed{border-left-color:var(--used);}
+  .note.warn{border-left-color:var(--danger);}
+  .note b{color:var(--ink);}
+
+  .legend{display:flex; flex-wrap:wrap; gap:.45rem; margin-bottom:1.1rem;}
+  .chip{
+    font-family:var(--mono); font-size:.68rem; padding:.22rem .55rem; border-radius:20px;
+    display:flex; align-items:center; gap:.35rem;
+  }
+  .chip .dot{width:8px; height:8px; border-radius:50%;}
+  .chip.used{background:rgba(79,174,99,.12); color:var(--used); border:1px solid rgba(79,174,99,.4);}
+  .chip.used .dot{background:var(--used);}
+  .chip.bridge{background:rgba(161,127,214,.14); color:var(--bridge); border:1px solid rgba(161,127,214,.45);}
+  .chip.bridge .dot{background:var(--bridge);}
+  .chip.danger{background:rgba(209,85,74,.12); color:var(--danger); border:1px solid rgba(209,85,74,.4);}
+  .chip.danger .dot{background:var(--danger);}
+  .chip.bootstrap{background:rgba(217,142,58,.12); color:var(--bootstrap); border:1px solid rgba(217,142,58,.4);}
+  .chip.bootstrap .dot{background:var(--bootstrap);}
+  .chip.power{background:rgba(224,195,74,.12); color:var(--power); border:1px solid rgba(224,195,74,.4);}
+  .chip.power .dot{background:var(--power);}
+  .chip.free{background:rgba(255,255,255,.04); color:var(--ink-dim); border:1px solid var(--rule);}
+  .chip.free .dot{background:var(--free);}
+
+  .board-wrap{overflow-x:auto; padding-bottom:.5rem;}
+  .board{display:grid; grid-template-columns: 1fr 1fr; gap:0 1rem; min-width:560px;}
+  .strip-title{
+    font-family:var(--mono); font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--ink-faint); text-align:center; margin-bottom:.4rem;
+  }
+  .zone-label{
+    font-family:var(--mono); font-size:.65rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-faint); margin:.7rem 0 .3rem; padding-top:.5rem; border-top:1px dashed var(--rule);
+  }
+  .col{display:flex; flex-direction:column; gap:3px;}
+  .row{
+    display:flex; align-items:center; gap:.5rem; padding:.3rem .55rem;
+    border-radius:5px; border:1px solid var(--rule); background:var(--bg-panel);
+    font-size:.76rem; min-height:2.15rem;
+  }
+  .row .rn{font-family:var(--mono); color:var(--ink-faint); font-size:.68rem; min-width:1.6rem;}
+  .row .label{font-family:var(--mono); font-weight:700; min-width:2.4rem;}
+  .row .fn{color:var(--ink-dim); font-size:.71rem; flex:1;}
+  .row .tag{
+    font-family:var(--mono); font-weight:800; font-size:.7rem; min-width:1.3rem; text-align:center;
+    border-radius:4px; padding:.05rem .3rem;
+  }
+
+  .row.used{border-color:rgba(79,174,99,.5); background:rgba(79,174,99,.07);}
+  .row.used .label{color:var(--used);}
+  .row.bridge{border-color:rgba(161,127,214,.5); background:rgba(161,127,214,.08);}
+  .row.bridge .label{color:var(--bridge);}
+  .row.bridge .tag{background:rgba(161,127,214,.25); color:var(--bridge);}
+  .row.danger{border-color:rgba(209,85,74,.45); background:rgba(209,85,74,.06);}
+  .row.danger .label{color:var(--danger);}
+  .row.bootstrap{border-color:rgba(217,142,58,.45); background:rgba(217,142,58,.06);}
+  .row.bootstrap .label{color:var(--bootstrap);}
+  .row.power{border-color:rgba(224,195,74,.4); background:rgba(224,195,74,.06);}
+  .row.power .label{color:var(--power);}
+  .row.free .label{color:var(--ink-faint);}
+  .row.cap{border-style:dashed; border-color:var(--power);}
+  .row.res{border-style:dashed; border-color:var(--danger);}
+  .row .capbadge{
+    font-family:var(--mono); font-size:.62rem; background:rgba(224,195,74,.15); color:var(--power);
+    border:1px solid rgba(224,195,74,.4); border-radius:4px; padding:.05rem .3rem; white-space:nowrap;
+  }
+  .row .resbadge{
+    font-family:var(--mono); font-size:.62rem; background:rgba(209,85,74,.12); color:var(--danger);
+    border:1px solid rgba(209,85,74,.4); border-radius:4px; padding:.05rem .3rem; white-space:nowrap;
+  }
+
+  table{width:100%; border-collapse:collapse; font-size:.82rem; margin-top:.5rem;}
+  caption{text-align:left; font-family:var(--mono); font-size:.68rem; color:var(--ink-faint); margin-bottom:.4rem; text-transform:uppercase; letter-spacing:.05em;}
+  th{text-align:left; font-family:var(--mono); font-size:.65rem; text-transform:uppercase; color:var(--ink-dim); border-bottom:1px solid var(--rule); padding:.35rem .45rem;}
+  td{padding:.35rem .45rem; border-bottom:1px solid var(--rule);}
+  tr:last-child td{border-bottom:none;}
+  .table-wrap{overflow-x:auto; margin-bottom:1.2rem;}
+  .tagcell{font-family:var(--mono); font-weight:800; color:var(--bridge);}
+
+  footer{color:var(--ink-faint); font-size:.75rem; margin-top:1.6rem; padding-top:1rem; border-top:1px solid var(--rule);}
+</style>
+</head>
+<body>
+<div style="background:#fbeceb;border:3px solid #b3261e;border-radius:6px;padding:14px 18px;margin:0 0 22px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#181c24;line-height:1.5">
+  <div style="font-size:1.05rem;font-weight:800;color:#b3261e;margin-bottom:6px">&#9940; DOCUMENTO DEPRECADO &mdash; PLANTA VIEJA</div>
+  <p style="margin:6px 0;font-size:.9rem">
+    Describe el robot <b>anterior al rearmado</b>: el protoboard de la era <b>L298N</b>, con el ESP32 en filas 1&ndash;19 y la zona de puentes en 20&ndash;30. El protoboard se rehizo dos veces desde entonces (2026-09-03 y 2026-09-12). Ese robot <b>ya no existe</b>.
+  </p>
+  <p style="margin:6px 0;font-size:.9rem">
+    <b>No usar para cablear, construir ni calcular.</b> Se conserva solo para repasar errores
+    y decisiones de esa etapa.
+  </p>
+  <p style="margin:6px 0 0;font-size:.85rem;color:#4b5563">
+    Documentaci&oacute;n vigente: <code>CLAUDE.md</code> y <code>docs/conexiones-registro-pruebas.md</code>
+    (filas del protoboard en <b>&sect;3.1b</b>). Planos vigentes: <code>docs/plano-potencia.html</code>,
+    <code>docs/plano-senales.html</code>, <code>docs/plano-distribucion-niveles.html</code>,
+    <code>docs/plantilla-imprimible-niveles.html</code>.
+  </p>
+</div>
+
+
+<h1>Plano — Protoboard del ESP32 (filas 1–30)</h1>
+<div class="sub">Solo este protoboard: ESP32 en filas 1–19, zona de conexión (puentes) en filas 20-30</div>
+
+<div class="note confirmed">
+  <b>Cableado real, confirmado por el usuario el 2026-08-05</b> — ya no es un
+  plano propuesto. Reemplaza la versión anterior (que usaba una asignación de
+  filas distinta, nunca cableada). Registrado también en
+  <code>docs/conexiones-registro-pruebas.md</code>, sección 3.1.
+  <br><br>
+  ✅ <b>QC de continuidad aprobado y primera energización validada</b> (sección
+  3.2): VIN = 4.8V, fila 29 (3V3) = 3.4V. Se encontró y corrigió un jumper sin
+  contacto real entre la bornera del Buck y la fila 1 — reemplazado por un
+  puente corto directo riel lógico(+)→VIN en columna J, fila 1.
+</div>
+
+<div class="note warn">
+  <b>Corrección de criterio de seguridad</b>: las 4 resistencias de pull-down
+  terminaron físicamente <b>en este protoboard</b> (filas 21, 22, 28, 29), no
+  junto al header del L298N como se había recomendado originalmente. Siguen
+  siendo muchísimo mejor que no tener pull-down, pero la garantía que ofrecen
+  ahora es "protegido desde el protoboard del ESP32 hacia adelante" — si el
+  cable entre esta fila y el pin IN del L298N se afloja, ese tramo puntual ya
+  no está cubierto por la resistencia.
+</div>
+
+<div class="note">
+  El L298N, los motores, el GY-521 y los encoders siguen en otro lugar
+  físico — las señales salen de acá por los cables de la zona de conexión
+  (filas 20+). Lo que cambió respecto al plano original es que las 4
+  resistencias de pull-down y el capacitor C4 sí están en este protoboard.
+  C1/C2/C3 (driver y motores) siguen fuera, junto al L298N.
+</div>
+
+<div class="legend">
+  <span class="chip used"><span class="dot"></span>Pin del ESP32</span>
+  <span class="chip bridge"><span class="dot"></span>Puente (misma señal, misma letra/número)</span>
+  <span class="chip power"><span class="dot"></span>Alimentación / capacitor</span>
+  <span class="chip bootstrap"><span class="dot"></span>Bootstrapping — no usar</span>
+  <span class="chip danger"><span class="dot"></span>Flash interna — nunca tocar</span>
+  <span class="chip free"><span class="dot"></span>Libre / sin usar</span>
+</div>
+
+<div class="board-wrap">
+  <div class="board">
+    <div class="col">
+      <div class="strip-title">Columnas A–E (lado derecho del pinout)</div>
+
+      <div class="zone-label">ESP32 — cuerpo de la placa</div>
+      <div class="row danger"><span class="rn">1</span><span class="label">CLK</span><span class="fn">nunca conectar</span></div>
+      <div class="row danger"><span class="rn">2</span><span class="label">SD0</span><span class="fn">nunca conectar</span></div>
+      <div class="row danger"><span class="rn">3</span><span class="label">SD1</span><span class="fn">nunca conectar</span></div>
+      <div class="row bootstrap"><span class="rn">4</span><span class="label">P15</span><span class="fn">bootstrap, libre</span></div>
+      <div class="row bootstrap"><span class="rn">5</span><span class="label">P2</span><span class="fn">bootstrap, libre</span></div>
+      <div class="row bootstrap"><span class="rn">6</span><span class="label">P0</span><span class="fn">bootstrap, libre</span></div>
+      <div class="row bridge"><span class="rn">7</span><span class="label">P4</span><span class="fn">ENB · PWM Motor 2 (columna E)</span><span class="tag">①</span></div>
+      <div class="row bridge"><span class="rn">8</span><span class="label">P17</span><span class="fn">IN4 · dirección M2 (columna D)</span><span class="tag">②</span></div>
+      <div class="row bridge"><span class="rn">9</span><span class="label">P16</span><span class="fn">IN3 · dirección M2 (columna C)</span><span class="tag">③</span></div>
+      <div class="row free"><span class="rn">10</span><span class="label">P5</span><span class="fn">bootstrap-caución, libre</span></div>
+      <div class="row free"><span class="rn">11</span><span class="label">P18</span><span class="fn">libre</span></div>
+      <div class="row free"><span class="rn">12</span><span class="label">P19</span><span class="fn">libre</span></div>
+      <div class="row free"><span class="rn">13</span><span class="label">GND</span><span class="fn">libre — no usada en esta zona</span></div>
+      <div class="row bridge"><span class="rn">14</span><span class="label">P21</span><span class="fn">SDA → GY-521 (columna C)</span><span class="tag">⑤</span></div>
+      <div class="row free"><span class="rn">15</span><span class="label">RX</span><span class="fn">USB — dejar libre</span></div>
+      <div class="row free"><span class="rn">16</span><span class="label">TX</span><span class="fn">USB — dejar libre</span></div>
+      <div class="row bridge"><span class="rn">17</span><span class="label">P22</span><span class="fn">SCL → GY-521 (columna A)</span><span class="tag">⑥</span></div>
+      <div class="row free"><span class="rn">18</span><span class="label">P23</span><span class="fn">libre</span></div>
+      <div class="row free"><span class="rn">19</span><span class="label">GND</span><span class="fn">libre — no usada en esta zona</span></div>
+
+      <div class="zone-label">Zona de conexión — hacia el L298N / GY-521</div>
+      <div class="row free"><span class="rn">20</span><span class="label">—</span><span class="fn">libre</span></div>
+      <div class="row free"><span class="rn">21</span><span class="label">—</span><span class="fn">libre</span></div>
+      <div class="row free"><span class="rn">22</span><span class="label">—</span><span class="fn">libre</span></div>
+      <div class="row bridge"><span class="rn">23</span><span class="label">SDA</span><span class="fn">⑤ → GY-521 SDA (columna C21)</span><span class="tag">⑤</span></div>
+      <div class="row bridge"><span class="rn">24</span><span class="label">SCL</span><span class="fn">⑥ → GY-521 SCL (columna A)</span><span class="tag">⑥</span></div>
+      <div class="row free"><span class="rn">25</span><span class="label">—</span><span class="fn">libre</span></div>
+      <div class="row free"><span class="rn">26</span><span class="label">—</span><span class="fn">libre</span></div>
+      <div class="row bridge"><span class="rn">27</span><span class="label">ENB</span><span class="fn">① → L298N ENB (columna E)</span><span class="tag">①</span></div>
+      <div class="row bridge res"><span class="rn">28</span><span class="label">IN4</span><span class="fn">② → L298N IN4 (columna D)</span><span class="tag">②</span><span class="resbadge">R→GND en A28</span></div>
+      <div class="row bridge res"><span class="rn">29</span><span class="label">IN3</span><span class="fn">③ → L298N IN3 (columna C)</span><span class="tag">③</span><span class="resbadge">R→GND en A29</span></div>
+      <div class="row free"><span class="rn">30</span><span class="label">—</span><span class="fn">libre</span></div>
+    </div>
+
+    <div class="col">
+      <div class="strip-title">Columnas F–J (lado izquierdo del pinout)</div>
+
+      <div class="zone-label">ESP32 — cuerpo de la placa</div>
+      <div class="row bridge power"><span class="rn">1</span><span class="label">5V</span><span class="fn">entrada desde riel Buck — puente corto directo en columna J (VIN), verificado 4.8V</span><span class="tag">Ⓐ</span></div>
+      <div class="row free"><span class="rn">2</span><span class="label">GND</span><span class="fn">libre, sin usar</span></div>
+      <div class="row danger"><span class="rn">3</span><span class="label">SD3</span><span class="fn">nunca conectar</span></div>
+      <div class="row danger"><span class="rn">4</span><span class="label">SD2</span><span class="fn">nunca conectar</span></div>
+      <div class="row bridge"><span class="rn">5</span><span class="label">P13</span><span class="fn">IN2 · dirección M1 (columna G)</span><span class="tag">Ⓑ</span></div>
+      <div class="row free"><span class="rn">6</span><span class="label">GND</span><span class="fn">libre, sin usar</span></div>
+      <div class="row free"><span class="rn">7</span><span class="label">P12</span><span class="fn">bootstrap, no usado — dejar libre</span></div>
+      <div class="row bridge"><span class="rn">8</span><span class="label">P14</span><span class="fn">IN1 · dirección M1 (columna H)</span><span class="tag">Ⓒ</span></div>
+      <div class="row bridge"><span class="rn">9</span><span class="label">P27</span><span class="fn">ENA · PWM Motor 1 (columna H)</span><span class="tag">Ⓓ</span></div>
+      <div class="row bridge"><span class="rn">10</span><span class="label">P26</span><span class="fn">Encoder M2 · canal B (columna F)</span><span class="tag">Ⓔ</span></div>
+      <div class="row bridge"><span class="rn">11</span><span class="label">P25</span><span class="fn">Encoder M2 · canal A (columna H)</span><span class="tag">Ⓕ</span></div>
+      <div class="row bridge"><span class="rn">12</span><span class="label">P33</span><span class="fn">Encoder M1 · canal B (columna F)</span><span class="tag">Ⓖ</span></div>
+      <div class="row bridge"><span class="rn">13</span><span class="label">P32</span><span class="fn">Encoder M1 · canal A (columna J)</span><span class="tag">Ⓗ</span></div>
+      <div class="row free"><span class="rn">14</span><span class="label">GND</span><span class="fn">libre — no usada en esta zona</span></div>
+      <div class="row free"><span class="rn">15</span><span class="label">P34</span><span class="fn">solo entrada, libre</span></div>
+      <div class="row free"><span class="rn">16</span><span class="label">SVN</span><span class="fn">solo entrada, libre</span></div>
+      <div class="row free"><span class="rn">17</span><span class="label">SVP</span><span class="fn">solo entrada, libre</span></div>
+      <div class="row free"><span class="rn">18</span><span class="label">EN</span><span class="fn">reset — no usar como GPIO</span></div>
+      <div class="row bridge power"><span class="rn">19</span><span class="label">3V3</span><span class="fn">VCC GY-521 + 2 encoders (columna G)</span><span class="tag">Ⓙ</span></div>
+
+      <div class="zone-label">Zona de conexión — hacia el L298N / encoders</div>
+      <div class="row free"><span class="rn">20</span><span class="label">—</span><span class="fn">libre</span></div>
+      <div class="row bridge res"><span class="rn">21</span><span class="label">IN2</span><span class="fn">Ⓑ → L298N IN2 (columna G)</span><span class="tag">Ⓑ</span><span class="resbadge">R→GND en I21</span></div>
+      <div class="row bridge res"><span class="rn">22</span><span class="label">IN1</span><span class="fn">Ⓒ → L298N IN1 (columna H)</span><span class="tag">Ⓒ</span><span class="resbadge">R→GND en I22</span></div>
+      <div class="row bridge"><span class="rn">23</span><span class="label">ENA</span><span class="fn">Ⓓ → L298N ENA (columna I)</span><span class="tag">Ⓓ</span></div>
+      <div class="row bridge"><span class="rn">24</span><span class="label">Enc.B</span><span class="fn">Ⓔ → Encoder M2 canal B (columna F)</span><span class="tag">Ⓔ</span></div>
+      <div class="row bridge"><span class="rn">25</span><span class="label">Enc.A</span><span class="fn">Ⓕ → Encoder M2 canal A (columna H)</span><span class="tag">Ⓕ</span></div>
+      <div class="row bridge"><span class="rn">26</span><span class="label">Enc.B</span><span class="fn">Ⓖ → Encoder M1 canal B (columna F)</span><span class="tag">Ⓖ</span></div>
+      <div class="row bridge"><span class="rn">27</span><span class="label">Enc.A</span><span class="fn">Ⓗ → Encoder M1 canal A (columna F)</span><span class="tag">Ⓗ</span></div>
+      <div class="row bridge power cap"><span class="rn">28</span><span class="label">5V</span><span class="fn">C4 pata + (columna F) — llega por puente desde fila 30</span><span class="capbadge">C4+ aquí</span></div>
+      <div class="row bridge power"><span class="rn">29</span><span class="label">3V3</span><span class="fn">Ⓙ → GY-521 + Enc.M1 + Enc.M2 VCC (columna G)</span><span class="tag">Ⓙ</span></div>
+      <div class="row bridge power"><span class="rn">30</span><span class="label">5V</span><span class="fn">Ⓐ — desde riel Buck (columnas F/G) → puente a fila 28</span><span class="tag">Ⓐ</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="note warn">
+  <b>Fila 30 — historial de un corto evitado.</b> En un borrador intermedio de
+  este cableado, la fila 30 tuvo 5V (columna F) y GND (columna J) **al mismo
+  tiempo** — como F y J están en la misma tira de 5 agujeros, eso era un corto
+  directo, no dos puntos distintos. Se corrigió: la fila 30 hoy es **solo 5V**,
+  y el GND de C4 va directo por cable al riel GND lógico, sin pasar por
+  ninguna fila numerada. Referencia si alguna vez hay que revisar esta zona:
+  nunca mezclar 5V y GND en la misma fila, aunque uses columnas distintas.
+</div>
+
+<div class="note">
+  <b>Patas a GND sin fila numerada:</b> las 4 resistencias de pull-down (en
+  A28, A29, I21, I22) y la pata negativa de C4 no aterrizan en otra fila de
+  esta zona — van con cable directo al mismo conductor de GND lógico que
+  entra al protoboard. Es válido: todo lo que solo necesita "algún GND" puede
+  ir directo a ese cable en vez de ocupar una fila más.
+</div>
+
+<div class="table-wrap">
+<table>
+  <caption>Capacitores en este protoboard</caption>
+  <thead><tr><th>ID</th><th>Valor</th><th>Ubicación</th><th>Nota</th></tr></thead>
+  <tbody>
+    <tr><td>C4</td><td>1000µF, 25V</td><td>Pata + en fila 28 (F, tira F-J) — alimentada por puente desde fila 30. Pata − directo al cable de GND lógico</td><td>✅ Instalado 2026-08-05</td></tr>
+    <tr><td>C6</td><td>100nF cerámico</td><td>—</td><td>⏳ Sin instalar — no hay fila libre disponible. No crítico, diferido.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="table-wrap">
+<table>
+  <caption>Resistencias de pull-down (10kΩ) — en este protoboard, no junto al L298N</caption>
+  <thead><tr><th>Señal</th><th>Fila (pin)</th><th>Pata a GND</th></tr></thead>
+  <tbody>
+    <tr><td>IN1</td><td>22 (H)</td><td>I22 → directo a GND lógico</td></tr>
+    <tr><td>IN2</td><td>21 (G)</td><td>I21 → directo a GND lógico</td></tr>
+    <tr><td>IN3</td><td>29 (C)</td><td>A29 → directo a GND lógico</td></tr>
+    <tr><td>IN4</td><td>28 (D)</td><td>A28 → directo a GND lógico</td></tr>
+    <tr><td>ENA / ENB</td><td>27 (ambos lados)</td><td>— sin resistencia —</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="table-wrap">
+<table>
+  <caption>Fuera de este protoboard (van con el L298N / motores)</caption>
+  <thead><tr><th>Componente</th><th>Dónde</th></tr></thead>
+  <tbody>
+    <tr><td>C1 — 1000µF ⚠️16V</td><td>VIN+/GND del L298N</td></tr>
+    <tr><td>C2 / C3 — 100nF</td><td>Terminales de potencia de Motor 1 / Motor 2</td></tr>
+    <tr><td>C5 — 1000µF</td><td>✅ Terminales de salida del Buck (5V), antes de dividirse hacia L298N y ESP32</td></tr>
+    <tr><td>C7 — 100nF</td><td>✅ Cerrado — sin función, el Nano no se usa</td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer>
+  Cableado real confirmado 2026-08-05, a partir de la orientación ya validada
+  (USB-C → fila 1, columnas A-E = lado derecho del pinout corregido) y de
+  <code>pinout-esp32.html</code> / <code>CLAUDE.md</code> /
+  <code>docs/conexiones-registro-pruebas.md</code> (sección 3.1).
+</footer>
+
+</body>
+</html>

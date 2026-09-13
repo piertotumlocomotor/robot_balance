@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conexiones del ESP32 — mapa consolidado, boot y desacople</title>
+<meta name="description" content="Configuración de conexiones del ESP32 con 2x BTS7960, MPU6050 y encoders: auditoría de pines de bootstrap, desacople contra reinicios del micro y ruteo en el chasis de 5 niveles.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f6f7f9;
+    --sig:#6b3fa0; --sig-bg:#f3eefa;
+    --i2c:#0f766e; --i2c-bg:#e6f4f1;
+    --enc:#1f7a3d; --enc-bg:#e9f7ee;
+    --pwr:#a1571a; --pwr-bg:#fbf1e6;
+    --danger:#b3261e; --danger-bg:#fbeceb;
+    --warn:#8a6d00; --warn-bg:#fbf6dc;
+    --ok:#1f7a3d; --ok-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0 auto; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:24px; font-size:15px; line-height:1.5; max-width:1080px;
+  }
+  h1{font-size:1.5rem; margin:0 0 4px; letter-spacing:-.01em;}
+  h2{font-size:1.05rem; margin:34px 0 10px; padding-bottom:5px; border-bottom:2px solid var(--rule);}
+  h3{font-size:.9rem; margin:22px 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em;}
+  .sub{color:var(--dim); font-size:.85rem; margin-bottom:16px;}
+  p{font-size:.9rem;}
+
+  .banner{background:var(--warn-bg); border:1px solid var(--warn); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin-bottom:18px;}
+  .stop{background:var(--danger-bg); border:1px solid var(--danger); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0; color:var(--danger);}
+  .good{background:var(--ok-bg); border:1px solid var(--ok); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0;}
+  .note{background:var(--panel); border:1px solid var(--rule); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; color:var(--dim); margin:14px 0;}
+  .banner b, .stop b, .note b, .good b{color:var(--ink);}
+
+  .figwrap{overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:#fff; padding:8px;}
+  svg{display:block;}
+  svg.wide{min-width:900px;}
+
+  table{border-collapse:collapse; width:100%; font-size:.85rem; margin:10px 0;}
+  th,td{border:1px solid var(--rule); padding:6px 9px; text-align:left; vertical-align:top;}
+  th{background:var(--panel); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--dim);}
+  code{font-family:var(--mono); font-size:.85em; background:var(--panel); padding:1px 4px; border-radius:3px;}
+  tr.sig td:first-child{border-left:3px solid var(--sig);}
+  tr.i2c td:first-child{border-left:3px solid var(--i2c);}
+  tr.enc td:first-child{border-left:3px solid var(--enc);}
+  tr.pwr td:first-child{border-left:3px solid var(--pwr);}
+  tr.bad{background:var(--danger-bg);}
+  tr.warnrow{background:var(--warn-bg);}
+  tr.okrow{background:var(--ok-bg);}
+  .tag{display:inline-block; font-size:.7rem; padding:1px 6px; border-radius:9px; font-weight:600;}
+  .t-new{background:var(--ok-bg); color:var(--ok); border:1px solid var(--ok);}
+  .t-old{background:var(--panel); color:var(--dim); border:1px solid var(--rule);}
+  .t-todo{background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn);}
+
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:.78rem; color:var(--dim); margin-top:10px;}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .sw{width:22px; height:0; border-top:3px solid;}
+
+  pre{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:10px 12px; font-family:var(--mono); font-size:.8rem; overflow-x:auto; margin:10px 0;}
+  ol,ul{font-size:.88rem;}
+  li{margin:4px 0;}
+
+  footer{color:var(--faint); font-size:.75rem; margin-top:40px; padding-top:10px; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:10mm; font-size:11px; max-width:none;}
+    .banner,.stop,.note,.good,th,tr.bad,tr.warnrow,tr.okrow,.tag,
+    tr.sig td:first-child,tr.i2c td:first-child,tr.enc td:first-child,tr.pwr td:first-child{
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    svg{min-width:0; width:100%;}
+    .figwrap{overflow:visible;}
+    h2{page-break-after:avoid;}
+    table{page-break-inside:avoid;}
+    @page{size:A4 portrait; margin:10mm;}
+  }
+</style>
+</head>
+<body>
+
+<h1>Conexiones del ESP32 — mapa consolidado, boot y desacople</h1>
+<div class="sub">
+  Chasis de 5 niveles · 2× BTS7960 (IBT-2) · MPU6050 en N1 · ESP32 en N4.
+  Complementa a <a href="plano-senales.html"><code>plano-senales.html</code></a> (mapeo GPIO↔protoboard,
+  tabla de verdad del driver) y <a href="plano-potencia.html"><code>plano-potencia.html</code></a>
+  (árbol de alimentación). <b>No los reemplaza.</b>
+</div>
+
+<div class="banner">
+  <b>Estado: en reconstrucción, casi cerrado.</b> ⚠️ Tras el rearmado del chasis se perdieron todos los
+  capacitores electrolíticos (solo sobrevivieron C2/C3, soldados a los motores). Reconstruidos hasta
+  ahora: <b>C5, C4, C1</b> (bulk) y <b>C9, C10, C11</b> (cerámicos) — solo falta <b>C6</b> (3V3) y
+  <b>C<sub>en</sub></b> (§4). Este documento parte del estado real, no del inventario viejo de
+  <code>CLAUDE.md</code> §6.
+  Lo que agrega respecto de los dos planos vigentes: <b>(1)</b> auditoría de comportamiento en boot de
+  los 12 GPIO en uso, con un cambio recomendado; <b>(2)</b> el plan de desacople reconstruido desde
+  cero, con el stock real disponible; <b>(3)</b> integridad de señal en el chasis nuevo, donde el MPU
+  queda tres niveles debajo del micro; <b>(4)</b> dos mediciones de 30 segundos sobre el módulo IBT-2
+  que pueden invalidar todo el esquema de pull-downs de seguridad.
+</div>
+
+<div class="stop">
+  <b>Nada de acá está medido en hardware.</b> Todo lo marcado <span class="tag t-todo">medir</span> es
+  condición previa, no comentario al margen. El proyecto ya perdió sesiones enteras por dar por buena
+  una cadena de razonamiento en lugar de una medición (ω₀ dos veces, K_U dos veces).
+</div>
+
+<h2>1. Diagrama de conexiones</h2>
+
+<div class="figwrap">
+<svg class="wide" viewBox="0 0 940 560" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+
+  <!-- niveles -->
+  <rect x="8" y="8" width="240" height="188" rx="6" fill="#fafbfc" stroke="#dfe3ea"/>
+  <text x="18" y="26" font-size="11" font-weight="600" fill="#8a93a3">NIVEL 1 — eje de ruedas</text>
+
+  <rect x="8" y="210" width="240" height="330" rx="6" fill="#fafbfc" stroke="#dfe3ea"/>
+  <text x="18" y="228" font-size="11" font-weight="600" fill="#8a93a3">NIVEL 2 — energía</text>
+
+  <rect x="660" y="8" width="272" height="300" rx="6" fill="#fafbfc" stroke="#dfe3ea"/>
+  <text x="670" y="26" font-size="11" font-weight="600" fill="#8a93a3">NIVEL 3 — drivers</text>
+
+  <rect x="330" y="60" width="250" height="330" rx="6" fill="#fafbfc" stroke="#dfe3ea"/>
+  <text x="340" y="78" font-size="11" font-weight="600" fill="#8a93a3">NIVEL 4 — lógica</text>
+
+  <!-- ESP32 -->
+  <rect x="352" y="92" width="206" height="272" rx="5" fill="#fff" stroke="#181c24" stroke-width="1.6"/>
+  <text x="455" y="114" font-size="13" font-weight="700" text-anchor="middle">ESP32</text>
+  <text x="455" y="129" font-size="10" fill="#4b5563" text-anchor="middle">NodeMCU ESP-32S · 38 pines</text>
+  <line x1="352" y1="138" x2="558" y2="138" stroke="#c7ccd6"/>
+
+  <!-- pines izquierda -->
+  <text x="364" y="158" font-size="10.5" font-family="monospace" fill="#0f766e">P21 SDA</text>
+  <text x="364" y="176" font-size="10.5" font-family="monospace" fill="#0f766e">P22 SCL</text>
+  <text x="364" y="200" font-size="10.5" font-family="monospace" fill="#1f7a3d">P32 P33</text>
+  <text x="364" y="216" font-size="10.5" font-family="monospace" fill="#1f7a3d">P25 P26</text>
+  <text x="364" y="248" font-size="10.5" font-family="monospace" fill="#a1571a">5V (VIN)</text>
+  <text x="364" y="266" font-size="10.5" font-family="monospace" fill="#a1571a">3V3</text>
+  <text x="364" y="284" font-size="10.5" font-family="monospace" fill="#a1571a">GND</text>
+  <text x="364" y="316" font-size="10.5" font-family="monospace" fill="#4b5563">EN (reset)</text>
+  <text x="364" y="346" font-size="10.5" font-family="monospace" fill="#4b5563">USB-C · debug</text>
+
+  <!-- pines derecha -->
+  <text x="546" y="166" font-size="10.5" font-family="monospace" fill="#6b3fa0" text-anchor="end">P27  EN  M1</text>
+  <text x="546" y="182" font-size="10.5" font-family="monospace" fill="#6b3fa0" text-anchor="end">P19 RPWM M1</text>
+  <text x="546" y="198" font-size="10.5" font-family="monospace" fill="#6b3fa0" text-anchor="end">P13 LPWM M1</text>
+  <text x="546" y="226" font-size="10.5" font-family="monospace" fill="#6b3fa0" text-anchor="end">P4   EN  M2</text>
+  <text x="546" y="242" font-size="10.5" font-family="monospace" fill="#6b3fa0" text-anchor="end">P16 RPWM M2</text>
+  <text x="546" y="258" font-size="10.5" font-family="monospace" fill="#6b3fa0" text-anchor="end">P17 LPWM M2</text>
+  <text x="546" y="290" font-size="10.5" font-family="monospace" fill="#8a93a3" text-anchor="end">P34 P35  IS (opc.)</text>
+
+  <!-- MPU -->
+  <rect x="26" y="38" width="150" height="52" rx="4" fill="#e6f4f1" stroke="#0f766e"/>
+  <text x="101" y="58" font-size="11.5" font-weight="600" text-anchor="middle">MPU6050 / GY-521</text>
+  <text x="101" y="74" font-size="9.5" fill="#0f766e" text-anchor="middle">3.3V · SDA · SCL · GND</text>
+
+  <!-- encoders -->
+  <rect x="26" y="104" width="150" height="72" rx="4" fill="#e9f7ee" stroke="#1f7a3d"/>
+  <text x="101" y="123" font-size="11.5" font-weight="600" text-anchor="middle">Encoders M1 / M2</text>
+  <text x="101" y="139" font-size="9.5" fill="#1f7a3d" text-anchor="middle">4 canales A/B · 3.3V · GND</text>
+  <text x="101" y="156" font-size="9.5" fill="#1f7a3d" text-anchor="middle">solidarios a los motores</text>
+  <text x="101" y="170" font-size="9" fill="#8a93a3" text-anchor="middle">(potencia del motor va al driver)</text>
+
+  <!-- bateria / buck -->
+  <rect x="26" y="250" width="150" height="46" rx="4" fill="#fbf1e6" stroke="#a1571a"/>
+  <text x="101" y="268" font-size="11.5" font-weight="600" text-anchor="middle">LiPo 3S + fusible</text>
+  <text x="101" y="284" font-size="9.5" fill="#a1571a" text-anchor="middle">switch · nodo estrella</text>
+
+  <rect x="26" y="316" width="150" height="46" rx="4" fill="#fbf1e6" stroke="#a1571a"/>
+  <text x="101" y="334" font-size="11.5" font-weight="600" text-anchor="middle">Buck XL4016</text>
+  <text x="101" y="350" font-size="9.5" fill="#a1571a" text-anchor="middle">riel lógico 5.0–5.1 V</text>
+
+  <rect x="26" y="392" width="204" height="132" rx="4" fill="#fff" stroke="#a1571a" stroke-dasharray="4 3"/>
+  <text x="128" y="410" font-size="10.5" font-weight="600" fill="#1f7a3d" text-anchor="middle">Desacople — casi cerrado</text>
+  <text x="36" y="428" font-size="9.5" font-family="monospace" fill="#1f7a3d">C5  1000µF/50V  salida Buck  ✓instalado</text>
+  <text x="36" y="444" font-size="9.5" font-family="monospace" fill="#1f7a3d">C4+C9  16V+104  fila 30-A    ✓ soldados juntos</text>
+  <text x="36" y="460" font-size="9.5" font-family="monospace" fill="#1f7a3d">C10/C11 104 cer.  header IBT-2 ✓instalados</text>
+  <text x="36" y="476" font-size="9.5" font-family="monospace">C6  104 (100nF) cer.  3V3 ESP32</text>
+  <text x="36" y="492" font-size="9.5" font-family="monospace">Cen 104 (100nF) cer.  EN → GND</text>
+
+  <!-- drivers -->
+  <rect x="678" y="44" width="236" height="106" rx="4" fill="#f3eefa" stroke="#6b3fa0"/>
+  <text x="796" y="64" font-size="11.5" font-weight="600" text-anchor="middle">IBT-2 #1 → Motor 1 (der.)</text>
+  <text x="690" y="82" font-size="9.5" font-family="monospace" fill="#6b3fa0">R_EN + L_EN (atados)  RPWM  LPWM</text>
+  <text x="690" y="98" font-size="9.5" font-family="monospace" fill="#6b3fa0">VCC 5V · GND · C10 100nF</text>
+  <text x="690" y="116" font-size="9.5" font-family="monospace" fill="#a1571a">B+ / B− ← nodo estrella (12 V)</text>
+  <text x="690" y="132" font-size="9.5" font-family="monospace" fill="#a1571a">M+ / M− → motor · Cbus 330µF a bordo</text>
+
+  <rect x="678" y="168" width="236" height="106" rx="4" fill="#f3eefa" stroke="#6b3fa0"/>
+  <text x="796" y="188" font-size="11.5" font-weight="600" text-anchor="middle">IBT-2 #2 → Motor 2 (izq.)</text>
+  <text x="690" y="206" font-size="9.5" font-family="monospace" fill="#6b3fa0">R_EN + L_EN (atados)  RPWM  LPWM</text>
+  <text x="690" y="222" font-size="9.5" font-family="monospace" fill="#6b3fa0">VCC 5V · GND · C11 100nF</text>
+  <text x="690" y="240" font-size="9.5" font-family="monospace" fill="#a1571a">B+ / B− ← nodo estrella (12 V)</text>
+  <text x="690" y="256" font-size="9.5" font-family="monospace" fill="#a1571a">M+ / M− → motor · Cbus 330µF a bordo</text>
+
+  <!-- pull-downs -->
+  <rect x="596" y="300" width="318" height="70" rx="4" fill="#fbeceb" stroke="#b3261e"/>
+  <text x="755" y="318" font-size="10.5" font-weight="600" fill="#b3261e" text-anchor="middle">Pull-downs de seguridad — en el protoboard del ESP32</text>
+  <text x="606" y="336" font-size="9.5" font-family="monospace">2× 10kΩ en EN (P27, P4) → GND  ← las que faltan</text>
+  <text x="606" y="352" font-size="9.5" font-family="monospace">4× 10kΩ en RPWM/LPWM → GND  ← ya instaladas</text>
+  <text x="606" y="366" font-size="9" fill="#b3261e">Sin la de EN, un cuelgue del ESP32 no apaga el puente.</text>
+
+  <!-- lineas -->
+  <path d="M176 64 C 250 64, 280 152, 352 152" fill="none" stroke="#0f766e" stroke-width="1.6" marker-end="url(#a)"/>
+  <text x="256" y="94" font-size="9" fill="#0f766e">I2C · 2 hilos</text>
+  <text x="256" y="105" font-size="9" fill="#0f766e">+ GND propio</text>
+  <text x="256" y="116" font-size="9" fill="#b3261e">~30 cm — §5</text>
+
+  <path d="M176 140 C 250 140, 280 208, 352 208" fill="none" stroke="#1f7a3d" stroke-width="1.6" marker-end="url(#a)"/>
+  <text x="256" y="172" font-size="9" fill="#1f7a3d">4 canales</text>
+  <text x="256" y="183" font-size="9" fill="#1f7a3d">+ 3V3 + GND</text>
+
+  <path d="M176 339 C 250 339, 300 252, 352 252" fill="none" stroke="#a1571a" stroke-width="1.8" marker-end="url(#a)"/>
+  <text x="240" y="300" font-size="9" fill="#a1571a">5 V lógico</text>
+
+  <path d="M101 296 L101 316" stroke="#a1571a" stroke-width="1.8" marker-end="url(#a)"/>
+
+  <path d="M558 172 C 610 172, 630 96, 678 96" fill="none" stroke="#6b3fa0" stroke-width="1.8" marker-end="url(#a)"/>
+  <text x="588" y="128" font-size="9" fill="#6b3fa0">3 líneas</text>
+
+  <path d="M558 236 C 610 236, 630 216, 678 216" fill="none" stroke="#6b3fa0" stroke-width="1.8" marker-end="url(#a)"/>
+  <text x="588" y="248" font-size="9" fill="#6b3fa0">3 líneas</text>
+
+  <path d="M176 274 C 400 274, 480 60, 678 74" fill="none" stroke="#a1571a" stroke-width="1.6" stroke-dasharray="5 3"/>
+  <path d="M176 274 C 400 274, 480 180, 678 198" fill="none" stroke="#a1571a" stroke-width="1.6" stroke-dasharray="5 3"/>
+  <text x="430" y="424" font-size="9" fill="#a1571a">— — —  potencia 12 V directa del nodo estrella a cada B+ (no pasa por N4)</text>
+
+  <path d="M596 334 C 570 334, 566 300, 558 300" fill="none" stroke="#b3261e" stroke-width="1.4"/>
+</svg>
+</div>
+
+<div class="legend">
+  <span><i class="sw" style="border-color:#0f766e"></i>I2C</span>
+  <span><i class="sw" style="border-color:#1f7a3d"></i>Encoders</span>
+  <span><i class="sw" style="border-color:#6b3fa0"></i>Control de drivers</span>
+  <span><i class="sw" style="border-color:#a1571a"></i>Alimentación</span>
+  <span><i class="sw" style="border-color:#b3261e"></i>Seguridad</span>
+</div>
+
+<h2>2. Tabla consolidada — ESP32 hacia cada componente</h2>
+
+<p>12 GPIO en uso, más 2 opcionales de sensado de corriente. Las filas de protoboard son las de
+<code>conexiones-registro-pruebas.md</code> §3.1; la única que cambia respecto de ese registro es la de
+<code>RPWM</code> M1 — ver §3.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:9%">Pin ESP32</th><th style="width:20%">Señal</th>
+      <th style="width:13%">Fila conexión</th><th style="width:24%">Destino</th><th>Nota</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="sig"><td><code>P27</code></td><td><code>R_EN</code>+<code>L_EN</code> M1</td><td>23 (I)</td><td>IBT-2 #1, ambos EN atados</td><td>⛔ falta su pull-down de 10kΩ</td></tr>
+    <tr class="sig"><td><code>P19</code> <span class="tag t-new">cambio</span></td><td><code>RPWM</code> M1</td><td>22 (H)</td><td>IBT-2 #1</td><td>Reemplaza a <code>P14</code> — ver §3</td></tr>
+    <tr class="sig"><td><code>P13</code></td><td><code>LPWM</code> M1</td><td>21 (G)</td><td>IBT-2 #1</td><td>Pull-down ya instalada (I21)</td></tr>
+    <tr class="sig"><td><code>P4</code></td><td><code>R_EN</code>+<code>L_EN</code> M2</td><td>27 (E)</td><td>IBT-2 #2, ambos EN atados</td><td>⛔ falta su pull-down de 10kΩ</td></tr>
+    <tr class="sig"><td><code>P16</code></td><td><code>RPWM</code> M2</td><td>29 (C)</td><td>IBT-2 #2</td><td>Pull-down ya instalada (A29)</td></tr>
+    <tr class="sig"><td><code>P17</code></td><td><code>LPWM</code> M2</td><td>28 (D)</td><td>IBT-2 #2</td><td>Pull-down ya instalada (A28)</td></tr>
+    <tr class="i2c"><td><code>P21</code></td><td>I2C SDA</td><td>23 (C)</td><td>GY-521 SDA</td><td rowspan="2">Pull-ups en el módulo GY-521 — <span class="tag t-todo">medir</span> su valor real. Tirada larga: ver §5</td></tr>
+    <tr class="i2c"><td><code>P22</code></td><td>I2C SCL</td><td>24 (A)</td><td>GY-521 SCL</td></tr>
+    <tr class="enc"><td><code>P32</code></td><td>Encoder M1 canal A</td><td>27 (F)</td><td>cable amarillo M1</td><td rowspan="4">Pines full-featured a propósito: si la salida fuera colector abierto hace falta pull-up interno, y los pines de solo-entrada no lo tienen</td></tr>
+    <tr class="enc"><td><code>P33</code></td><td>Encoder M1 canal B</td><td>26 (F)</td><td>cable verde M1</td></tr>
+    <tr class="enc"><td><code>P25</code></td><td>Encoder M2 canal A</td><td>25 (H)</td><td>cable amarillo M2</td></tr>
+    <tr class="enc"><td><code>P26</code></td><td>Encoder M2 canal B</td><td>24 (F)</td><td>cable verde M2</td></tr>
+    <tr class="pwr"><td><code>3V3</code></td><td>Alimentación de sensores</td><td>⚠️ ahora fila 3 / 12 (ver registro 3.1b)</td><td>GY-521 VCC + VCC de los 2 encoders</td><td>✅ C6 (104, 100nF) instalado 2026-09-12</td></tr>
+    <tr class="pwr"><td><code>5V</code> (VIN)</td><td>Entrada del riel lógico</td><td>30 (B: cable a VIN · C: jumper del carril 5V)</td><td>salida del Buck</td><td>✅ C4 (1000µF/16V) instalado en 30-A. Falta C9 (104) — recomendado, §4</td></tr>
+    <tr class="pwr"><td><code>GND</code></td><td>Referencia común</td><td>—</td><td>riel GND lógico</td><td>⚠️ obligatorio: el GND del USB <b>no</b> lo reemplaza (§7.6b del registro)</td></tr>
+    <tr><td><code>EN</code></td><td>Reset del módulo</td><td>—</td><td>—</td><td>Sumar C<sub>en</sub> 100nF a GND — §4</td></tr>
+    <tr><td><code>P34</code> / <code>P35</code></td><td><code>R_IS</code>+<code>L_IS</code> por módulo</td><td>—</td><td>IBT-2 #1 / #2</td><td>Opcional. ADC1: los únicos que funcionan con el WiFi activo</td></tr>
+  </tbody>
+</table>
+
+<h3>Lo que NO pasa por el ESP32</h3>
+<ul>
+  <li><b>Potencia de los motores</b>: nodo estrella → <code>B+</code>/<code>B−</code> de cada IBT-2 → <code>M+</code>/<code>M−</code> al motor. Nunca toca N4.</li>
+  <li><b>Alimentación de los drivers</b>: <code>VCC</code> de cada módulo va al riel de 5 V del Buck, no a un pin del ESP32. El chip BTS7960 no tiene pin de alimentación lógica —
+      es el <b>módulo</b> el que necesita esos 5 V para su circuitería de control (confirmado en la ficha del IBT-2). Sin ese cable el driver no conmuta nada aunque el firmware reporte bien: es el bug que ya costó una sesión con el L298N.</li>
+</ul>
+
+<h2>3. Auditoría de boot de los 12 GPIO en uso</h2>
+
+<p>Dos cosas distintas que suelen mezclarse: un pin de <b>bootstrap</b> es leído por el chip al arrancar
+y su nivel cambia el modo de arranque; un pin con <b>actividad en boot</b> se comporta como salida
+durante el arranque aunque el firmware no lo haya configurado. El primero rompe el boot, el segundo
+mueve un motor. Hay que evitar los dos.</p>
+
+<table>
+  <thead><tr><th style="width:12%">Pin</th><th style="width:20%">Función asignada</th><th style="width:20%">¿Bootstrap?</th><th>Actividad en boot</th></tr></thead>
+  <tbody>
+    <tr class="okrow"><td><code>P21</code> <code>P22</code></td><td>I2C</td><td>No</td><td>Ninguna reportada. ✅ limpios</td></tr>
+    <tr class="okrow"><td><code>P32</code> <code>P33</code> <code>P25</code> <code>P26</code></td><td>Encoders</td><td>No</td><td>Ninguna reportada. Son entradas, además. ✅ limpios</td></tr>
+    <tr class="okrow"><td><code>P27</code></td><td><code>EN</code> M1</td><td>No</td><td>Ninguna reportada. ✅ limpio — y es el pin crítico, el que corta el puente</td></tr>
+    <tr class="okrow"><td><code>P13</code></td><td><code>LPWM</code> M1</td><td>No (es JTAG MTCK, no strapping)</td><td>Ninguna reportada. ✅ limpio</td></tr>
+    <tr class="okrow"><td><code>P4</code></td><td><code>EN</code> M2</td><td>No</td><td>Ninguna reportada. ✅ limpio</td></tr>
+    <tr class="warnrow"><td><code>P16</code> <code>P17</code></td><td><code>RPWM</code>/<code>LPWM</code> M2</td><td>No</td><td>⚠️ Los usa la <b>PSRAM</b> en módulos WROVER. En un WROOM-32 quedan libres. <span class="tag t-todo">verificar</span> la serigrafía del módulo blindado antes de energizar</td></tr>
+    <tr class="bad"><td><code>P14</code></td><td><code>RPWM</code> M1 <span class="tag t-old">actual</span></td><td>No (es JTAG MTMS, no strapping)</td><td>⛔ <b>Reportado consistentemente como pin con salida activa durante el boot</b>, junto con 1, 3, 5 y 15. <b>No figura en el datasheet oficial</b> — tratarlo como sospecha fuerte, no como dato cerrado</td></tr>
+  </tbody>
+</table>
+
+<h3>El problema concreto de <code>P14</code>, y por qué igual no es catastrófico</h3>
+
+<p>Un tren de pulsos en <code>RPWM</code> M1 durante el arranque solo es inofensivo mientras
+<code>EN</code> M1 esté en bajo, porque con <code>EN</code>=0 el puente está apagado sin importar
+<code>IN</code> (tabla de verdad, Infineon §4.4.5). O sea: <b>hoy la seguridad en boot del motor 1
+depende enteramente de una resistencia de 10kΩ que todavía no está instalada.</b> Eso no es defensa en
+profundidad, es un único punto de falla.</p>
+
+<div class="good">
+  <b>Cambio recomendado: mover <code>RPWM</code> M1 de <code>P14</code> a <code>P19</code>.</b>
+  <code>P19</code> está libre, es full-featured, no es bootstrap y no tiene actividad reportada en boot.
+  <b>Cuesta mover un solo jumper</b>: el que hoy va de la fila 8 columna H (pin <code>P14</code>) a la
+  fila 22 columna H pasa a salir de la fila 12 columna A–E (pin <code>P19</code>) hacia esa misma fila 22.
+  La pull-down de I22 y el cable hacia el driver no se tocan. <code>P14</code> queda libre.
+</div>
+
+<div class="note">
+  <b>Alternativa si se prefiere no tocar el cableado:</b> dejar <code>P14</code> y aceptar que la
+  pull-down de <code>EN</code> es la única protección — pero entonces esa resistencia deja de ser
+  "defensa en profundidad" y pasa a ser obligatoria y crítica, y conviene verificarla con óhmetro en
+  cada rearmado. Con el robot desarmado el cambio de pin es más barato que esa disciplina.
+</div>
+
+<h3>Pines que siguen prohibidos</h3>
+<table>
+  <thead><tr><th style="width:26%">Pines</th><th>Motivo</th></tr></thead>
+  <tbody>
+    <tr class="bad"><td><code>6</code>–<code>11</code></td><td><b>Nunca usar</b> — flash SPI interna.</td></tr>
+    <tr><td><code>0</code>, <code>2</code>, <code>12</code>, <code>15</code></td><td>Bootstrap. <code>GPIO12</code> en alto al arrancar puede impedir el boot.</td></tr>
+    <tr><td><code>5</code></td><td>Bootstrap <i>y</i> con pulso en boot. Nunca para algo que mueva un motor.</td></tr>
+    <tr><td><code>1</code>, <code>3</code></td><td>TX/RX — reservados para debug USB.</td></tr>
+    <tr><td><code>34</code>, <code>35</code>, <code>36</code>, <code>39</code></td><td>Solo entrada, sin pull-up/pull-down interno. Reservados para el sensado de corriente opcional.</td></tr>
+  </tbody>
+</table>
+
+<p><b>Libres después del cambio:</b> <code>14</code>, <code>18</code>, <code>23</code> full-featured, más
+<code>36</code>/<code>39</code> de solo entrada si no se usa el sensado de corriente.</p>
+
+<h2>4. Capacitores contra reinicios del ESP32</h2>
+
+<div class="good">
+  <b>Casi todo reconstruido: C5, C4, C1, C9, C10 y C11 ya están instalados (2026-09-06).</b> El
+  rearmado del chasis se había llevado puestos los cuatro electrolíticos (C1, C4, C4b, C5); solo
+  sobrevivió C2/C3, soldados a los motores. El razonamiento de esta sección (por qué reconstruir desde
+  cero pesa distinto que "duplicar lo que ya había") queda como contexto de por qué se priorizaron en
+  ese orden — no como pendiente. Lo único que falta: <b>C6</b> (3V3) y <b>C<sub>en</sub></b> (§4.3).
+</div>
+
+<h3>4.1 Qué hacía cada uno y qué falta ahora que no está ninguno</h3>
+
+<p>La caída de tensión que produce un pico de corriente sobre un capacitor es
+<code>ΔV = I · Δt / C</code>. Con un pico de 300 mA — el orden de magnitud de una ráfaga de transmisión
+WiFi — sobre el riel de 5 V, sin ningún capacitor de bulk (situación actual) contra la que había antes
+del rearmado:</p>
+
+<table>
+  <thead><tr><th style="width:22%">Duración del pico</th><th style="width:20%">Carga que pide</th><th style="width:22%">Caída sin bulk (hoy)</th><th>Caída con 1000µF (lo que había antes de sumar C4b)</th></tr></thead>
+  <tbody>
+    <tr><td>200 µs</td><td>60 µC</td><td>≈0 V — solo la ESR/pistas amortiguan</td><td>60 mV</td></tr>
+    <tr class="warnrow"><td>1 ms</td><td>300 µC</td><td>colapso, sin nada que lo sostenga</td><td>300 mV</td></tr>
+    <tr class="bad"><td>10 ms</td><td>3 mC</td><td>colapso</td><td>3.0 V (ya colapsaba antes también)</td></tr>
+  </tbody>
+</table>
+
+<p><b>Cómo se lee esta tabla:</b> antes del rearmado, duplicar el bulk (C4→C4+C4b) solo hubiera cambiado
+algo en la franja del milisegundo — y aun así no cambió el síntoma, lo que ya era señal de que el
+problema no era pura capacidad de almacenamiento (ver §4.2). <b>Hoy el punto de partida es peor que
+"insuficiente": es cero.</b> Cualquier electrolítico que se vuelva a poner, aunque sea uno solo, es una
+mejora real — pero antes de comprar de más, vale la pena entender qué pasó realmente en el diagnóstico
+viejo, porque puede que el problema real nunca haya sido la falta de bulk.</p>
+
+<h3>4.2 La sospecha que sí vale la pena perseguir: el margen de <i>dropout</i></h3>
+
+<p>Del propio registro (§3.2, unidad vieja): el Buck entregaba <b>4.98 V</b> en sus terminales y en el VIN del ESP32 se
+midieron <b>4.8 V</b>. Esos 0.18 V perdidos en cable y contactos, si en ese momento el consumo era del
+orden de 100–150 mA, implican <b>~1.2–1.8 Ω en serie</b> — mucho para un tramo de alimentación.</p>
+
+<p>El LDO de 3.3 V de la placa necesita un mínimo de tensión de entrada por encima de los 3.3 V para
+seguir regulando. Partiendo de 4.8 V en vez de 4.98 V (⚠️ la unidad vigente da <b>5.01 V</b> desde 2026-09-12 — rehacer esta cuenta con ese número), el margen antes de que el riel de 3V3 se derrumbe
+es de unos pocos centenares de mV — <b>del mismo orden que la caída de 300 mV de la tabla de arriba.</b>
+No hace falta que el capacitor sea chico para que el sistema se caiga: alcanza con arrancar demasiado
+abajo.</p>
+
+<div class="note">
+  <span class="tag t-todo">medir</span> <b>Leer la serigrafía del regulador de 3.3 V de la placa</b> y
+  buscar su tensión de <i>dropout</i> real. En estas placas suele ser un AMS1117-3.3 (dropout típico del
+  orden de 1.1 V a corriente alta), pero <b>no está confirmado en este hardware</b> y de ese número
+  depende todo el cálculo de margen. No asumirlo.
+</div>
+
+<p><b>Dos acciones baratas, en este orden:</b></p>
+<ol>
+  <li><b>Recuperar los 0.18 V</b>: cable más corto y más grueso del Buck al VIN, y rehacer ese contacto
+  (ese mismo tramo ya dio un falso contacto una vez, §3.2). Volver a medir la caída con una carga
+  conocida — si sigue en 0.18 V, el problema está en el conector, no en el cable.</li>
+  <li><b>Subir el Buck a 5.1–5.2 V</b>, no más. ⚠️ Ese riel también alimenta el <code>VCC</code> de los
+  dos IBT-2, así que hay que verificar antes el rango admisible de <code>VCC</code> del módulo — la ficha
+  lo especifica como "+5 V" sin dar tolerancia. <span class="tag t-todo">verificar</span></li>
+</ol>
+
+<h3>4.3 Lista de reconstrucción, priorizada y ajustada al stock real</h3>
+
+<p>Un electrolítico de 1000µF no responde a transitorios rápidos: su ESR e inductancia lo hacen
+prácticamente invisible por encima de unos pocos cientos de kHz. Antes del rearmado, el riel de 3V3
+—el que alimenta al chip y al radio— <b>ya</b> no tenía ningún cerámico propio (C6 había quedado
+diferido). Hoy, sin ni siquiera el bulk grueso, ese hueco importa más, no menos.</p>
+
+<div class="good">
+  <b>Inventario disponible, confirmado 2026-09-03:</b> electrolíticos <b>1000µF/16V</b>,
+  <b>1000µF/50V</b> y <b>100µF/25V</b>, y cerámicos marcados <b>104</b> — código EIA: 10×10⁴ pF =
+  <b>100nF</b>, exactamente el valor que pide todo el desacople de alta frecuencia de esta sección.
+  También hay marcados <b>101</b> (100pF) — demasiado chicos para desacople de alimentación, no sirven
+  acá. No hay cerámico de 10µF: <b>C8 queda descartado</b>, sin pérdida grave porque ya era opcional.
+</div>
+
+<p>Conviene asignar cada valor por tensión y rol del nodo, no por el rótulo histórico del componente:
+<b>16V donde el riel es de 5V</b> (margen 3.2×, de sobra); el <b>100µF/25V en el nodo estrella</b>
+—que toca hasta 12.6V de batería llena, y donde el de 16V dejaría solo 1.27× de margen, insuficiente—
+porque 25V es justo uno de los dos valores que este proyecto ya había fijado como objetivo para C1. Eso
+deja el <b>1000µF/50V libre como reserva</b>, por ejemplo para bulk extra en <code>B+</code>/<code>B−</code>
+de algún driver si alguna vez aparece evidencia de caída de bus real (hoy no la hay, §7.20 del registro).</p>
+
+<table>
+  <thead><tr><th style="width:9%">ID</th><th style="width:18%">Valor a usar</th><th style="width:22%">Ubicación</th><th style="width:9%">Prioridad</th><th>Estado / propósito</th></tr></thead>
+  <tbody>
+    <tr class="okrow"><td><b>C5</b></td><td>1000µF <b>50V</b></td><td>Salida 5 V del Buck</td><td>Esencial</td><td>✅ <b>Instalado (2026-09-03).</b> Es el único punto donde un solo capacitor protege a la vez la rama del ESP32 y la de los dos drivers. El de 50V es más de lo que este nodo de 5V necesita, pero no hace daño — solo ocupa más lugar físico.</td></tr>
+    <tr class="okrow"><td><b>C4</b></td><td>1000µF <b>16V</b></td><td>Fila 30, columna A (ver §4.4)</td><td>Esencial</td><td>✅ <b>Instalado (2026-09-03).</b> El de <b>16V</b>, no el de 50V: este nodo es de ~5V, y así se reservó el stock de 50V para C1. Pegado al <code>VIN</code>, filtra lo que C5 no llega a filtrar por la resistencia del cable entre ambos. ⏳ Pendiente verificar con multímetro continuidad 30-A↔30-C y GND del protoboard↔GND lógico (§4.4).</td></tr>
+    <tr class="okrow"><td><b>C9</b></td><td>104 (100nF cerámico)</td><td>Fila 30-A, soldado junto con C4 (mismo empalme)</td><td>Recomendado</td><td>✅ <b>Instalado (2026-09-06).</b> Responde a los transitorios que C4/C5 no alcanzan a filtrar. Soldado directamente pata a pata con C4 (+ con +, − con −), sin depender de contacto de protoboard entre ambos.</td></tr>
+    <tr class="warnrow"><td><b>C6</b></td><td>104 (100nF cerámico)</td><td><b>3V3 ↔ GND del ESP32</b></td><td>Recomendado</td><td>✅ <b>Instalado 2026-09-12</b> (fila 12 → riel "−"). Protege al chip y al radio — la banda que ni C4 ni C5 cubren.</td></tr>
+    <tr class="warnrow"><td><b>C<sub>en</sub></b></td><td>104 (100nF cerámico)</td><td><code>EN</code> (reset) ↔ GND</td><td>Recomendado</td><td>⏳ Nuevo, stock confirmado. Ataca directo el reset espurio por ruido. ⚠️ <b>No usar el 101 (100pF) ni nada mayor a 100nF</b>: muy chico no filtra nada, muy grande puede romper el auto-reset de la carga por USB.</td></tr>
+    <tr class="okrow"><td><b>C10 / C11</b></td><td>104 (100nF cerámico) ×2</td><td>Soldados directo en el header de señal de cada IBT-2, entre <code>VCC</code> y <code>GND</code></td><td>Recomendado</td><td>✅ <b>Instalados (2026-09-06)</b>, uno por driver — no en el protoboard del ESP32, sino pegados al módulo mismo, que es donde más importan. Los MOSFET del BTS7960 conmutan más rápido que los BJT del L298N: más di/dt inyectado al mismo riel de 5V que alimenta al ESP32. El dupont de cada header quedó también asegurado mecánicamente sobre la unión soldada.</td></tr>
+    <tr><td><s>C8</s></td><td>10µF cerámico X5R/X7R</td><td><s>3V3 ↔ GND, en paralelo con C6</s></td><td><s>Opcional</s></td><td>⛔ <b>Descartado — no hay ese valor en stock.</b> Si más adelante se consigue, sumarlo solo si después de C4/C5/C6 el AP sigue cayéndose.</td></tr>
+    <tr class="okrow"><td><b>C1</b></td><td>100µF <b>25V</b></td><td><b>Bornera <code>IN+</code>/<code>IN−</code> del Buck</b>, junto al cable combinado — no en la soldadura</td><td>Recomendado</td><td>✅ <b>Instalado (2026-09-03).</b> El 25V calza con el objetivo ya fijado en el proyecto. Menos capacidad que el 1000µF original, pero cada IBT-2 ya trae 330µF de fábrica pegado a su <code>B+</code>/<code>B−</code> (660µF entre los dos) — el reservorio que importa en la conmutación está ahí, C1 aguas abajo es secundario. La bornera del Buck solo tuvo que alojar 2 conductores (cable combinado + C1), no 4 — cierra en la práctica el conflicto que traía <code>plano-potencia.html</code> §3.</td></tr>
+    <tr><td><b>C<sub>bus</sub></b></td><td>330µF a bordo ×2</td><td><code>B+</code>/<code>B−</code> de cada IBT-2</td><td>—</td><td>De fábrica en el módulo, si ese módulo no se tocó. No depende del rearmado del chasis — verificar igual que siga soldado.</td></tr>
+    <tr class="okrow"><td><b>C2 / C3</b></td><td>100nF cerámico ×2</td><td>Pestañas de cada motor</td><td>—</td><td>✅ Sobrevivieron el rearmado — soldados al motor, no al protoboard. Ruido de escobillas, sin cambios.</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>Cambio de topología, 2026-09-03:</b> el nodo estrella ya no es una bornera dedicada como
+  documentaba <code>CLAUDE.md</code> antes de esta fecha. La topología real tiene <b>dos etapas</b>:
+  batería + <code>B+</code>/<code>B−</code> de M1 y de M2 se unen en una <b>soldadura</b> (empalme
+  mecánico + estaño) — ese es el nodo estrella real — de la que sale un solo cable combinado hacia la
+  <b>bornera de entrada del Buck</b>. Esa bornera recibe ese cable combinado más la pata de C1: <b>2
+  conductores, no 4</b>. ✅ Con eso, el conflicto de capacidad quedó cerrado — la bornera nunca tuvo que
+  alojar batería + los 2 <code>B+</code> directamente, solo el cable ya combinado. Detalle en
+  <code>conexiones-registro-pruebas.md</code> §1 y §8.3.
+</div>
+
+<div class="note">
+  <b>Por qué C4 sigue siendo "esencial" con C5 ya puesto:</b> C5 protege el reparto general del riel,
+  pero está a un tramo de cable del ESP32 (con su propia resistencia parásita — el mismo efecto que ya
+  costó 0.18V de caída en el tramo Buck→VIN, §3.2). C4, pegado al VIN, filtra lo que ese tramo de cable
+  desacopla. Los dos hacen falta; ninguno reemplaza al otro. Los cerámicos, a su vez, filtran una banda
+  de frecuencia que ningún electrolítico cubre — tampoco son sustitutos entre sí.
+</div>
+
+<h3>4.4 Dónde ponerlos, empezando por los dos esenciales</h3>
+
+<p><b>C5</b> no va en el protoboard del ESP32: va directo en los terminales de salida del Buck (5V/GND),
+antes de que el riel se reparta hacia el ESP32 y hacia el <code>VCC</code> de los dos IBT-2 — mismo
+lugar que antes del rearmado.</p>
+
+<div class="good">
+  <b>C4 — ubicación real, confirmada 2026-09-03.</b> El protoboard rearmado quedó así en la
+  fila 30: columna <b>B</b> es el cable que alimenta <code>VIN</code> del ESP32; columna <b>A</b> es la
+  pata <b>+</b> del capacitor; columna <b>C</b> recibe un jumper en U desde el carril de 5V del
+  protoboard. Como A, B y C son la misma tira de 5 agujeros, los tres quedan en el mismo nodo eléctrico
+  — el capacitor, el cable a <code>VIN</code> y la alimentación del carril, sin ningún tramo de más
+  entre el capacitor y el pin. Es más corto que el esquema viejo (que necesitaba puentear entre dos
+  filas distintas, 30→28) y es prácticamente la distancia mínima posible en este protoboard. La pata
+  <b>−</b> va al riel GND del protoboard, no a una fila numerada.
+  <ul>
+    <li>⏳ <b>Verificar con multímetro, antes de dar por buena esta ubicación</b>: continuidad entre A
+    y C (confirma que las tres columnas son realmente el mismo nodo), y continuidad entre el riel GND
+    del protoboard y el GND lógico común que ya comparten el MPU y los encoders. Es la misma lección de
+    §3.2 y §7.6b — un contacto flojo en esta tira daría un capacitor que "está" pero no protege nada.</li>
+  </ul>
+</div>
+
+<p>Para el resto (C6, C9, C<sub>en</sub>, C10/C11), la guía que sigue se escribió sobre el plano de
+protoboard <b>anterior al rearmado</b> — el hallazgo de que este protoboard nuevo tiene un carril de 5V
+y un carril de GND dedicados (algo que el plano viejo no documentaba) sugiere que puede haber una forma
+más simple de ubicarlos, directo sobre esos carriles, en vez de buscar filas libres adyacentes. Queda
+como propuesta a confirmar contra el protoboard real, igual que se hizo recién con C4:</p>
+
+<table>
+  <thead><tr><th style="width:16%">Fila</th><th style="width:22%">Nodo</th><th>Cómo se alimenta</th></tr></thead>
+  <tbody>
+    <tr><td>20 (A–E)</td><td>5 V</td><td>Puente desde la fila 30 (F/G), donde ya llega el riel del Buck</td></tr>
+    <tr><td>21 (A–E)</td><td>GND</td><td>Cable al riel GND lógico</td></tr>
+    <tr><td>25 (A–E)</td><td>3V3</td><td>Puente desde la fila 29 (columna H o I, misma tira que el 3V3 existente)</td></tr>
+    <tr><td>26 (A–E)</td><td>GND</td><td>Puente desde la fila 21</td></tr>
+    <tr><td>20 (F–J)</td><td>GND</td><td>Cable al riel GND lógico — es el retorno de C<sub>en</sub></td></tr>
+  </tbody>
+</table>
+
+<pre>C9  100nF   B20 ↔ B21     (5V)      1 fila de separación
+C6  100nF   B25 ↔ B26     (3V3)     1 fila
+C8  10µF    C25 ↔ C26     (3V3)     1 fila, en paralelo con C6
+Cen 100nF   H18 ↔ H20     (EN)      2 filas — el pin EN está en la fila 18 del lado F–J</pre>
+
+<div class="stop">
+  <b>Antes de energizar, repetir el QC de §3.2 sobre las filas nuevas:</b> continuidad 5V↔GND y
+  3V3↔GND deben dar <b>abierto</b>. Un borrador anterior de este mismo protoboard tuvo un corto por
+  poner 5V y GND en la misma tira de 5 agujeros. Las columnas A–E y F–J son tiras independientes,
+  pero <b>dentro</b> de una tira todos los agujeros de la fila son el mismo nodo.
+</div>
+
+<h3>4.5 Instrumentar antes de seguir comprando componentes</h3>
+
+<p>El proyecto ya tiene la lección anotada dos veces: lo que destrabó el enlace UART fue instrumentar
+para distinguir "no llega nada" de "llega corrupto", no acumular hipótesis. Acá aplica igual —
+<b>el ESP32 sabe por qué se reinició y todavía no se le preguntó</b>:</p>
+
+<pre>#include "esp_system.h"
+
+void setup() {
+  Serial.begin(115200);
+  delay(200);
+  Serial.printf("Reset reason: %d\n", esp_reset_reason());
+  // ESP_RST_BROWNOUT (6) -> es caída de riel: seguir con §4.2
+  // ESP_RST_TASK_WDT / ESP_RST_INT_WDT -> es firmware, no alimentación
+  // ESP_RST_PANIC -> excepción de software
+}</pre>
+
+<p>Además, el núcleo de Arduino-ESP32 imprime <code>Brownout detector was triggered</code> por Serial
+cuando el detector de subtensión dispara. <b>Si ese mensaje no aparece nunca, el reinicio no es por
+alimentación</b> y todos los capacitores de esta sección son buena práctica pero no la cura.</p>
+
+<div class="note">
+  Corolario incómodo pero honesto: es posible que <b>el AP se caiga sin que el ESP32 se reinicie</b>.
+  Son dos síntomas distintos y hasta ahora se los trató como uno. La lectura del <i>reset reason</i>
+  los separa en un solo arranque.
+</div>
+
+<h2>5. Integridad de señal en el chasis nuevo</h2>
+
+<div class="stop">
+  <b>Problema nuevo que introduce el rediseño y todavía no está en ningún plano:</b> el MPU6050 vive en
+  <b>N1</b> y el ESP32 en <b>N4</b>. Con los huecos entre niveles, el I2C pasa a ser una tirada de
+  <b>~25–30 cm</b> — y en el camino atraviesa <b>N3, el nivel de los drivers</b>. En el chasis viejo
+  el MPU estaba en el mismo nivel que el protoboard.
+</div>
+
+<table>
+  <thead><tr><th style="width:22%">Enlace</th><th style="width:14%">Largo aprox.</th><th>Medidas</th></tr></thead>
+  <tbody>
+    <tr class="i2c">
+      <td>I2C (SDA, SCL)<br>N1 → N4</td><td>25–30 cm</td>
+      <td>
+        <b>Es el enlace más frágil del robot.</b> Un bus I2C largo y con capacidad parásita alta pierde
+        pendiente de flanco y empieza a dar NACKs — y su falla se ve como "el MPU dejó de responder",
+        que en este proyecto ya se confundió una vez con un problema de alimentación (§7.13).
+        <ul>
+          <li>Bajar a <b>100 kHz</b> para el bring-up. Subir a 400 kHz solo si hace falta ancho de banda y después de verificar que no aparecen errores de lectura.</li>
+          <li>Llevar <b>un GND dedicado en el mismo mazo</b>, trenzado con SDA/SCL. No usar el GND de la estructura como retorno.</li>
+          <li><span class="tag t-todo">medir</span> el valor real de los pull-ups del GY-521 (óhmetro entre SDA y VCC con el módulo desconectado). Si son 4.7kΩ y el bus da errores, bajarlos a ~2.2kΩ agregando resistencias en paralelo del lado del ESP32.</li>
+          <li>Instrumentar el firmware para <b>contar errores de I2C</b>, no solo leer el sensor. Un bus que falla el 1% de las lecturas es invisible si nadie cuenta.</li>
+        </ul>
+      </td>
+    </tr>
+    <tr class="enc">
+      <td>Encoders (4 canales)<br>N1 → N4</td><td>25–30 cm</td>
+      <td>
+        Menos crítico: son señales lentas y el conteo por interrupción tolera bastante. Pero comparten
+        mazo con el I2C y suben el acople. Llevar GND propio en el mazo. Si aparecen conteos espurios,
+        activar el pull-up interno y considerar un RC simple (1kΩ + 10nF) por canal. ⚠️ Un RC filtra ruido
+        <b>y</b> pulsos legítimos: verificar contra el PPR ya medido (69.1) que no se pierden cuentas.
+      </td>
+    </tr>
+    <tr class="sig">
+      <td>Control de drivers<br>N4 → N3</td><td>5–8 cm</td>
+      <td>
+        Corto, es la ventaja de haber puesto los drivers en N3, justo debajo de la lógica.
+        <span class="tag t-todo">verificar</span> si el módulo IBT-2 ya trae las resistencias serie que
+        el datasheet recomienda en las entradas digitales (hay SMD visibles junto al header). Si hay que
+        agregarlas, <b>no poner 10kΩ en las líneas de PWM</b>: con la capacidad de entrada del chip esa
+        resistencia redondea los flancos a 20 kHz. Para <code>RPWM</code>/<code>LPWM</code>, del orden de
+        1kΩ; los 10kΩ tienen más sentido en <code>EN</code>, que es estática.
+      </td>
+    </tr>
+    <tr class="pwr">
+      <td>Potencia de motores<br>N3 → N1</td><td>10–15 cm</td>
+      <td>
+        Es la fuente de ruido más fuerte del robot. <b>Trenzar cada par <code>M+</code>/<code>M−</code></b>
+        para minimizar el área del lazo, y separarlo físicamente del mazo de señales. Donde tengan que
+        cruzarse, que crucen a <b>90°</b>, nunca en paralelo.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. ⛔ Dos mediciones que pueden invalidar el esquema de seguridad</h2>
+
+<div class="stop">
+  <b>Todo el esquema de pull-downs asume que las entradas del módulo IBT-2 no tienen pull-up a
+  <code>VCC</code>.</b> Si el módulo trae un pull-up de 10kΩ a 5 V en <code>R_EN</code>/<code>L_EN</code>,
+  la pull-down externa de 10kΩ forma un divisor y el pin queda en <b>2.5 V</b> — por encima del umbral
+  alto de 2.15 V del datasheet. Es decir: <b>el puente quedaría habilitado justo cuando el ESP32 se
+  cuelga</b>, que es exactamente el escenario contra el que existe la resistencia.
+</div>
+
+<table>
+  <thead><tr><th style="width:38%">Medición (módulo desconectado)</th><th style="width:24%">Resultado esperado</th><th>Si da distinto</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>1.</b> Resistencia de <code>R_EN</code> a <code>VCC</code>, y de <code>R_EN</code> a
+      <code>GND</code>. Repetir en <code>RPWM</code>.</td>
+      <td>Abierto hacia <code>VCC</code>. Hacia <code>GND</code>, abierto o un pull-down ya presente.</td>
+      <td>Si hay pull-up a <code>VCC</code>: la pull-down externa tiene que ser <b>mucho más chica</b> que
+      él (regla práctica: 1/10, o sea ~1kΩ contra un pull-up de 10kΩ) para llevar el pin por debajo de
+      1.1 V. Recalcular el divisor con el valor real medido, no con el nominal.</td>
+    </tr>
+    <tr>
+      <td><b>2.</b> Continuidad entre <code>B−</code> (bornera) y <code>GND</code> (header).</td>
+      <td>Continuidad — el chip tiene un solo GND (datasheet §6.2).</td>
+      <td>Si dan continuidad: cablear <b>solo <code>B−</code></b> al nodo estrella y <b>no</b> llevar el
+      <code>GND</code> del header al riel lógico, o se arma un lazo de masa. Si están separados, cablear
+      ambos.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>⚠️ La medición 1 no está en ningún checklist del proyecto todavía. La 2 sí (§8.4 del registro).
+Ninguna de las dos lleva más de 30 segundos y las dos deciden cómo se cablea.</p>
+
+<h2>7. Checklist antes de la primera energización</h2>
+
+<p>Extiende el de §8.8 del registro con lo específico de este documento.</p>
+
+<ol>
+  <li><b>Módulo del ESP32</b>: leer la serigrafía y confirmar WROOM-32 (no WROVER) antes de confiar en <code>P16</code>/<code>P17</code>.</li>
+  <li><b>Regulador de 3.3 V</b>: leer la serigrafía y anotar su <i>dropout</i>.</li>
+  <li><b>IBT-2</b>: las dos mediciones de §6, en los dos módulos.</li>
+  <li><b>Pull-downs</b>: las 2 nuevas en <code>EN</code> instaladas, con el valor recalculado según §6. Verificar las 6 con óhmetro.</li>
+  <li><b>Capacitores reconstruidos</b>: C5, C4 (fila 30-A), C1 (bornera del Buck), C9 (soldado junto con C4) y C10/C11 (soldados en el header de cada driver) ✅ ya instalados. Verificar con multímetro continuidad 30-A↔30-C y GND del protoboard↔GND lógico (§4.4) antes de dar C4/C9 por buenos. Recomendado sumar todavía C6 (3V3) y C<sub>en</sub> (<code>EN</code>). Ver la lista de §4.3.</li>
+  <li><b>QC de continuidad</b>: 5V↔GND abierto, 3V3↔GND abierto, con los capacitores nuevos ya puestos.</li>
+  <li><b>Switch de V+ en ON</b>, y <code>B+</code> de <b>cada</b> módulo mide ~12 V contra GND de potencia (son dos entradas, medir las dos).</li>
+  <li><code>VCC</code> de <b>cada</b> módulo mide ~5 V.</li>
+  <li><b>Continuidad GND ESP32 ↔ GND del driver.</b> El Serial por USB funcionando <b>no</b> prueba esto — trae su propia referencia. Es el bug que ya apareció tres veces.</li>
+  <li><b>Caída del riel</b>: medir 5 V en el terminal del Buck y en el VIN del ESP32 con el sistema encendido. Si difieren más de ~50 mV, atacar §4.2 antes de seguir.</li>
+  <li><b>Primer arranque sin motores conectados</b> (borneras <code>M+</code>/<code>M−</code> flojas): confirmar el <i>reset reason</i> por Serial y que el AP levante con batería sola.</li>
+  <li><b>Sentido de giro validado por encoder</b> antes de subir el duty (Fase 1 del Test 3). Al recablear a <code>M+</code>/<code>M−</code> se perdió la corrección física que se le había hecho a M1.</li>
+  <li><b>Cap de PWM en 121</b>, no 160. El 160 se calibró contra los BJT del L298N; ese driver ya no está.</li>
+</ol>
+
+<footer>
+  Generado 2026-09-03. <b>Propuesta — nada verificado en hardware.</b>
+  Fuente de verdad ante cualquier discrepancia: <code>CLAUDE.md</code> y
+  <code>docs/conexiones-registro-pruebas.md</code> (§2, §3, §3.1, §3.2, §4, §5, §6, §8).
+  Umbrales lógicos y tabla de verdad: <code>docs/BTS7960.pdf</code> (Infineon, Rev 1.1).
+  Pinout del módulo y rango de <code>B+</code>: <code>docs/bts7960_datasheet.pdf</code> (IBT-2 / HW-039).
+  Complementa a <a href="plano-senales.html"><code>plano-senales.html</code></a> y
+  <a href="plano-potencia.html"><code>plano-potencia.html</code></a>; ninguno de los dos queda obsoleto.
+</footer>
+
+</body>
+</html>

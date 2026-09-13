@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plano de señales de control — Robot Balanceador</title>
+<meta name="description" content="Señales de control del robot balanceador con ESP32 y 2x BTS7960: mapeo GPIO, filas de protoboard, pull-downs de seguridad, I2C del MPU6050 y encoders.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f6f7f9;
+    --sig:#6b3fa0; --sig-bg:#f3eefa;
+    --i2c:#0f766e; --i2c-bg:#e6f4f1;
+    --enc:#1f7a3d; --enc-bg:#e9f7ee;
+    --danger:#b3261e; --danger-bg:#fbeceb;
+    --warn:#8a6d00; --warn-bg:#fbf6dc;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0 auto; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:24px; font-size:15px; line-height:1.5; max-width:1080px;
+  }
+  h1{font-size:1.5rem; margin:0 0 4px; letter-spacing:-.01em;}
+  h2{font-size:1.05rem; margin:32px 0 10px; padding-bottom:5px; border-bottom:2px solid var(--rule);}
+  .sub{color:var(--dim); font-size:.85rem; margin-bottom:16px;}
+
+  .banner{background:var(--warn-bg); border:1px solid var(--warn); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin-bottom:18px;}
+  .stop{background:var(--danger-bg); border:1px solid var(--danger); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; margin:14px 0; color:var(--danger);}
+  .note{background:var(--panel); border:1px solid var(--rule); border-left-width:4px; border-radius:4px; padding:10px 14px; font-size:.85rem; color:var(--dim); margin:14px 0;}
+  .banner b, .stop b, .note b{color:var(--ink);}
+
+  .figwrap{overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:#fff; padding:8px;}
+  svg{display:block;}
+  svg.wide{min-width:880px;}
+  svg.mid{min-width:620px;}
+
+  table{border-collapse:collapse; width:100%; font-size:.85rem; margin:10px 0;}
+  th,td{border:1px solid var(--rule); padding:6px 9px; text-align:left; vertical-align:top;}
+  th{background:var(--panel); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--dim);}
+  code{font-family:var(--mono); font-size:.85em; background:var(--panel); padding:1px 4px; border-radius:3px;}
+  tr.sig td:first-child{border-left:3px solid var(--sig);}
+  tr.i2c td:first-child{border-left:3px solid var(--i2c);}
+  tr.enc td:first-child{border-left:3px solid var(--enc);}
+  tr.miss{background:var(--danger-bg);}
+
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:.78rem; color:var(--dim); margin-top:10px;}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .sw{width:22px; height:0; border-top:3px solid;}
+
+  pre{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:10px 12px; font-family:var(--mono); font-size:.8rem; overflow-x:auto; margin:10px 0;}
+
+  footer{color:var(--faint); font-size:.75rem; margin-top:36px; padding-top:10px; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:10mm; font-size:11px; max-width:none;}
+    .banner,.stop,.note,th,tr.miss,tr.sig td:first-child,tr.i2c td:first-child,tr.enc td:first-child{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    svg{min-width:0; width:100%;}
+    .figwrap{overflow:visible;}
+    h2{page-break-after:avoid;}
+    table{page-break-inside:avoid;}
+    @page{size:A4 portrait; margin:10mm;}
+  }
+</style>
+</head>
+<body>
+
+<h1>Plano de señales de control — Robot Balanceador</h1>
+<div class="sub">Solo señales de control y lógica. La alimentación está en <a href="plano-potencia.html"><code>plano-potencia.html</code></a>.</div>
+
+<div class="banner">
+  <b>Estado: plan, no cableado.</b> Refleja la arquitectura con <b>2× BTS7960 (IBT-2)</b>, decidida el
+  2026-08-29. Reemplaza la parte de señales de <code>obsoleto/plano-electrico.html</code>, que describe el L298N.
+  <b>Los 6 GPIO y las filas de protoboard no cambian</b> respecto al L298N — cambia a qué pin del
+  módulo llega cada cable.
+</div>
+
+<h2>1. Mapa de señales</h2>
+
+<div class="figwrap">
+<svg class="wide" viewBox="0 0 880 560" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Mapa de señales: el ESP32 se conecta a cinco periféricos. Tres GPIO a cada uno de los dos módulos IBT-2 (EN, RPWM y LPWM), dos GPIO de I2C más alimentación al MPU6050, y dos canales de encoder más alimentación a cada uno de los dos motores.">
+  <defs>
+    <marker id="as" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#6b3fa0"/>
+    </marker>
+    <marker id="ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#0f766e"/>
+    </marker>
+    <marker id="ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#1f7a3d"/>
+    </marker>
+  </defs>
+  <g font-family="-apple-system, Segoe UI, sans-serif">
+
+    <!-- ESP32 -->
+    <rect x="30" y="60" width="196" height="430" rx="6" fill="#f3eefa" stroke="#6b3fa0" stroke-width="2"/>
+    <text x="128" y="88" text-anchor="middle" font-size="14" font-weight="700">ESP32</text>
+    <text x="128" y="106" text-anchor="middle" font-size="11" fill="#4b5563">NodeMCU ESP-32S</text>
+    <text x="128" y="122" text-anchor="middle" font-size="10.5" fill="#4b5563">38 pines · CP2102</text>
+    <line x1="50" y1="136" x2="206" y2="136" stroke="#c7ccd6" stroke-width="1"/>
+    <text x="128" y="156" text-anchor="middle" font-size="10.5" fill="#8a6d00">12 GPIO usados</text>
+    <text x="128" y="172" text-anchor="middle" font-size="10" fill="#4b5563">Libres: 5, 18, 19, 23</text>
+    <text x="128" y="187" text-anchor="middle" font-size="10" fill="#4b5563">+ 34, 35, 36, 39 (in)</text>
+    <line x1="50" y1="200" x2="206" y2="200" stroke="#c7ccd6" stroke-width="1"/>
+    <text x="128" y="220" text-anchor="middle" font-size="10.5" fill="#4b5563">TX/RX reservados</text>
+    <text x="128" y="234" text-anchor="middle" font-size="10.5" fill="#4b5563">para debug USB</text>
+    <text x="128" y="264" text-anchor="middle" font-size="10.5" font-weight="600" fill="#6b3fa0">PWM = periférico LEDC</text>
+    <text x="128" y="279" text-anchor="middle" font-size="10" fill="#4b5563">20 kHz · 8 bits · duty 0-255</text>
+    <text x="128" y="310" text-anchor="middle" font-size="10.5" font-weight="600" fill="#8a6d00">3V3 → MPU + encoders</text>
+    <text x="128" y="326" text-anchor="middle" font-size="10" fill="#4b5563">5V (VIN) ← riel del Buck</text>
+    <text x="128" y="356" text-anchor="middle" font-size="10" fill="#b3261e" font-weight="600">⚠️ GND del ESP32 al riel</text>
+    <text x="128" y="370" text-anchor="middle" font-size="10" fill="#b3261e">lógico común — sin esto</text>
+    <text x="128" y="384" text-anchor="middle" font-size="10" fill="#b3261e">nada conmuta</text>
+
+    <!-- Driver M1 -->
+    <path d="M226,110 L556,110" stroke="#6b3fa0" stroke-width="3" fill="none" marker-end="url(#as)"/>
+    <text x="250" y="102" font-size="10.5" fill="#6b3fa0" font-weight="600">GPIO27 → EN · GPIO19 → RPWM · GPIO13 → LPWM</text>
+    <rect x="556" y="66" width="294" height="86" rx="6" fill="#f3eefa" stroke="#6b3fa0" stroke-width="2"/>
+    <text x="703" y="90" text-anchor="middle" font-size="13" font-weight="700">IBT-2 · Motor 1 (derecho)</text>
+    <text x="703" y="108" text-anchor="middle" font-size="10.5" fill="#4b5563">R_EN + L_EN atados juntos → un solo EN</text>
+    <text x="703" y="124" text-anchor="middle" font-size="10.5" fill="#4b5563">RPWM / LPWM = sentido y velocidad</text>
+    <text x="703" y="142" text-anchor="middle" font-size="10" fill="#b3261e" font-weight="600">⏳ falta pull-down 10kΩ en EN</text>
+
+    <!-- Driver M2 -->
+    <path d="M226,210 L556,210" stroke="#6b3fa0" stroke-width="3" fill="none" marker-end="url(#as)"/>
+    <text x="250" y="202" font-size="10.5" fill="#6b3fa0" font-weight="600">GPIO4 → EN · GPIO16 → RPWM · GPIO17 → LPWM</text>
+    <rect x="556" y="166" width="294" height="86" rx="6" fill="#f3eefa" stroke="#6b3fa0" stroke-width="2"/>
+    <text x="703" y="190" text-anchor="middle" font-size="13" font-weight="700">IBT-2 · Motor 2 (izquierdo)</text>
+    <text x="703" y="208" text-anchor="middle" font-size="10.5" fill="#4b5563">R_EN + L_EN atados juntos → un solo EN</text>
+    <text x="703" y="224" text-anchor="middle" font-size="10.5" fill="#4b5563">RPWM / LPWM = sentido y velocidad</text>
+    <text x="703" y="242" text-anchor="middle" font-size="10" fill="#b3261e" font-weight="600">⏳ falta pull-down 10kΩ en EN</text>
+
+    <!-- MPU -->
+    <path d="M226,300 L556,300" stroke="#0f766e" stroke-width="3" fill="none" marker-end="url(#ai)"/>
+    <text x="250" y="292" font-size="10.5" fill="#0f766e" font-weight="600">GPIO21 → SDA · GPIO22 → SCL · 3V3 · GND</text>
+    <rect x="556" y="266" width="294" height="66" rx="6" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+    <text x="703" y="290" text-anchor="middle" font-size="13" font-weight="700">MPU6050 (GY-521)</text>
+    <text x="703" y="308" text-anchor="middle" font-size="10.5" fill="#4b5563">I2C · alimentado a 3.3V</text>
+    <text x="703" y="324" text-anchor="middle" font-size="10" fill="#8a6d00">Z=arriba · Y=pitch · X=eje ruedas</text>
+
+    <!-- Encoder M1 -->
+    <path d="M226,390 L556,390" stroke="#1f7a3d" stroke-width="3" fill="none" marker-end="url(#ae)"/>
+    <text x="250" y="382" font-size="10.5" fill="#1f7a3d" font-weight="600">GPIO32 → canal A · GPIO33 → canal B · 3V3 · GND</text>
+    <rect x="556" y="356" width="294" height="60" rx="6" fill="#e9f7ee" stroke="#1f7a3d" stroke-width="2"/>
+    <text x="703" y="380" text-anchor="middle" font-size="13" font-weight="700">Encoder Motor 1</text>
+    <text x="703" y="398" text-anchor="middle" font-size="10.5" fill="#4b5563">cuadratura 1x · 69.1 pulsos/vuelta</text>
+
+    <!-- Encoder M2 -->
+    <path d="M226,470 L556,470" stroke="#1f7a3d" stroke-width="3" fill="none" marker-end="url(#ae)"/>
+    <text x="250" y="462" font-size="10.5" fill="#1f7a3d" font-weight="600">GPIO25 → canal A · GPIO26 → canal B · 3V3 · GND</text>
+    <rect x="556" y="436" width="294" height="60" rx="6" fill="#e9f7ee" stroke="#1f7a3d" stroke-width="2"/>
+    <text x="703" y="460" text-anchor="middle" font-size="13" font-weight="700">Encoder Motor 2</text>
+    <text x="703" y="478" text-anchor="middle" font-size="10.5" fill="#4b5563">signo opuesto a M1 — montaje en espejo</text>
+
+    <text x="440" y="530" text-anchor="middle" font-size="10.5" fill="#8a93a3">
+      Cada flecha es un grupo de cables, no un solo conductor. Filas exactas de protoboard en la tabla de §2.
+    </text>
+  </g>
+</svg>
+</div>
+
+<div class="legend">
+  <span><i class="sw" style="border-color:#6b3fa0"></i> Control de motores</span>
+  <span><i class="sw" style="border-color:#0f766e"></i> I2C (sensor)</span>
+  <span><i class="sw" style="border-color:#1f7a3d"></i> Encoders</span>
+</div>
+
+<h2>2. Mapeo GPIO → protoboard → destino</h2>
+
+<p style="font-size:.88rem;">Notación de protoboard: <code>columna+fila</code>. Las columnas A–E y F–J son
+tiras independientes; dentro de una misma tira, cualquier columna de esa fila es el mismo nodo.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:10%">GPIO</th><th style="width:22%">Función</th>
+      <th style="width:13%">Fila ESP32</th><th style="width:15%">Fila conexión</th><th>Destino</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="sig"><td><code>27</code></td><td><code>R_EN</code>+<code>L_EN</code> M1 <span style="color:#8a93a3">(era ENA)</span></td><td>9 (H)</td><td><b>23 (I)</b></td><td>IBT-2 M1 — atar ambos EN juntos</td></tr>
+    <tr class="sig"><td><code>14</code></td><td><code>RPWM</code> M1 <span style="color:#8a93a3">(era IN1)</span></td><td>8 (H)</td><td>22 (H)</td><td>IBT-2 M1</td></tr>
+    <tr class="sig"><td><code>13</code></td><td><code>LPWM</code> M1 <span style="color:#8a93a3">(era IN2)</span></td><td>5 (G)</td><td>21 (G)</td><td>IBT-2 M1</td></tr>
+    <tr class="sig"><td><code>4</code></td><td><code>R_EN</code>+<code>L_EN</code> M2 <span style="color:#8a93a3">(era ENB)</span></td><td>7 (E)</td><td><b>27 (E)</b></td><td>IBT-2 M2 — atar ambos EN juntos</td></tr>
+    <tr class="sig"><td><code>16</code></td><td><code>RPWM</code> M2 <span style="color:#8a93a3">(era IN3)</span></td><td>9 (C)</td><td>29 (C)</td><td>IBT-2 M2</td></tr>
+    <tr class="sig"><td><code>17</code></td><td><code>LPWM</code> M2 <span style="color:#8a93a3">(era IN4)</span></td><td>8 (D)</td><td>28 (D)</td><td>IBT-2 M2</td></tr>
+    <tr class="i2c"><td><code>21</code></td><td>I2C SDA</td><td>14 (C)</td><td>23 (C)</td><td>GY-521 SDA</td></tr>
+    <tr class="i2c"><td><code>22</code></td><td>I2C SCL</td><td>17 (A)</td><td>24 (A)</td><td>GY-521 SCL</td></tr>
+    <tr class="enc"><td><code>32</code></td><td>Encoder M1 canal A</td><td>13 (J)</td><td>27 (F)</td><td>cable amarillo</td></tr>
+    <tr class="enc"><td><code>33</code></td><td>Encoder M1 canal B</td><td>12 (F)</td><td>26 (F)</td><td>cable verde</td></tr>
+    <tr class="enc"><td><code>25</code></td><td>Encoder M2 canal A</td><td>11 (H)</td><td>25 (H)</td><td>cable amarillo</td></tr>
+    <tr class="enc"><td><code>26</code></td><td>Encoder M2 canal B</td><td>10 (F)</td><td>24 (F)</td><td>cable verde</td></tr>
+    <tr><td><code>3V3</code></td><td>Alimentación de sensores</td><td>19 (G)</td><td>29 (G)</td><td>GY-521 VCC + VCC de ambos encoders</td></tr>
+    <tr><td><code>5V</code></td><td>Entrada desde riel del Buck</td><td>1 (F/J)</td><td>30 (F/G)</td><td>ver <code>plano-potencia.html</code></td></tr>
+    <tr><td><code>GND</code></td><td>Referencia común</td><td>—</td><td>—</td><td>⚠️ obligatorio al riel GND lógico</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>Coincidencias de fila que NO son conflicto:</b> las filas 23, 24, 27 y 29 aparecen dos veces,
+  pero cada par cae en tiras distintas (A–E vs F–J), así que son nodos independientes. Ej.: fila 23
+  tiene SDA en <code>C</code> y el EN de M1 en <code>I</code>.
+</div>
+
+<h2>3. ⛔ Pull-downs de seguridad — cambian de pines con este driver</h2>
+
+<div class="stop">
+  <b>Tal como está hoy, la protección por hardware no cubre el caso que importa.</b> Las 4 pull-downs
+  instaladas protegen los pines que ahora son <code>RPWM</code>/<code>LPWM</code>. Con el BTS7960
+  <b>el pin que corta el puente es <code>EN</code></b>, y hoy no tiene ninguna.
+</div>
+
+<p style="font-size:.88rem;"><b>Por qué</b> — tabla de verdad del datasheet oficial (Infineon, §4.4.5):</p>
+
+<table>
+  <thead><tr><th style="width:14%"><code>INH</code>/<code>EN</code></th><th style="width:14%"><code>IN</code></th><th style="width:36%">Salidas</th><th>Modo</th></tr></thead>
+  <tbody>
+    <tr style="background:var(--danger-bg)"><td><b>0</b></td><td>X <span style="color:#8a93a3">(cualquiera)</span></td><td><b>Ambas OFF</b></td><td><b>Stand-by — motor liberado</b></td></tr>
+    <tr><td>1</td><td>0</td><td>LSS ON</td><td>salida a masa</td></tr>
+    <tr><td>1</td><td>1</td><td>HSS ON</td><td>salida a V+</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:.88rem;">Textual, §4.4.1: <i>"To deactivate both switches, the INH pin has to be set
+to low."</i> La pull-down en <code>EN</code> es <b>necesaria y suficiente</b>; las de
+<code>RPWM</code>/<code>LPWM</code> por sí solas no apagan nada.</p>
+
+<table>
+  <thead><tr><th style="width:16%">Cantidad</th><th style="width:16%">Valor</th><th style="width:38%">Dónde</th><th>Estado</th></tr></thead>
+  <tbody>
+    <tr><td>4×</td><td>10kΩ</td><td>Filas 21 (I), 22 (I), 28 (A), 29 (A) → GND<br><span style="color:#4b5563">líneas <code>RPWM</code>/<code>LPWM</code></span></td><td>✅ instaladas 2026-08-05 — <b>conservarlas</b></td></tr>
+    <tr><td><b>2×</b></td><td><b>10kΩ</b></td><td><b>J10 (M1) y A9 (M2) → riel "−"</b><br><span style="color:#4b5563">líneas <code>EN</code> (nodo <code>R_EN</code>+<code>L_EN</code> atados). ⚠️ Filas del protoboard <b>rearmado 2026-09-12</b> — las viejas 23-I / 27-E ya no existen</span></td><td><b>✅ INSTALADAS 2026-09-12</b></td></tr>
+  </tbody>
+</table>
+
+<h3 style="font-size:.9rem; margin:20px 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em;">Cómo se monta cada pull-down</h3>
+
+<div class="figwrap">
+<svg class="mid" viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Detalle de montaje del pull-down: la resistencia de 10 kilohms va en paralelo, desde el mismo nodo del cable que une el GPIO del ESP32 con el pin EN del driver, hacia masa. No va en serie interrumpiendo el cable.">
+  <g font-family="-apple-system, Segoe UI, sans-serif">
+    <rect x="20" y="42" width="140" height="46" rx="5" fill="#f3eefa" stroke="#6b3fa0" stroke-width="1.5"/>
+    <text x="90" y="62" text-anchor="middle" font-size="11.5" font-weight="700">ESP32</text>
+    <text x="90" y="78" text-anchor="middle" font-size="10.5" fill="#4b5563">GPIO27 / GPIO4</text>
+
+    <rect x="440" y="42" width="150" height="46" rx="5" fill="#f3eefa" stroke="#6b3fa0" stroke-width="1.5"/>
+    <text x="515" y="62" text-anchor="middle" font-size="11.5" font-weight="700">IBT-2</text>
+    <text x="515" y="78" text-anchor="middle" font-size="10.5" fill="#4b5563">R_EN + L_EN</text>
+
+    <!-- cable principal -->
+    <line x1="160" y1="65" x2="440" y2="65" stroke="#6b3fa0" stroke-width="3"/>
+    <circle cx="300" cy="65" r="5" fill="#6b3fa0"/>
+    <text x="300" y="34" text-anchor="middle" font-size="10.5" fill="#6b3fa0" font-weight="600">J10 (M1) / A9 (M2) — protoboard rearmado</text>
+
+    <!-- derivacion a la resistencia -->
+    <line x1="300" y1="65" x2="300" y2="105" stroke="#b3261e" stroke-width="2.5"/>
+    <rect x="277" y="105" width="46" height="26" rx="3" fill="#fff" stroke="#b3261e" stroke-width="2"/>
+    <text x="300" y="123" text-anchor="middle" font-size="11" font-weight="700" fill="#b3261e">10kΩ</text>
+    <line x1="300" y1="131" x2="300" y2="158" stroke="#b3261e" stroke-width="2.5"/>
+    <line x1="278" y1="158" x2="322" y2="158" stroke="#b3261e" stroke-width="3"/>
+    <line x1="285" y1="165" x2="315" y2="165" stroke="#b3261e" stroke-width="2.5"/>
+    <line x1="292" y1="172" x2="308" y2="172" stroke="#b3261e" stroke-width="2"/>
+    <text x="332" y="168" font-size="10.5" fill="#b3261e" font-weight="600">GND lógico</text>
+
+    <text x="310" y="199" text-anchor="middle" font-size="10.5" fill="#4b5563">
+      En PARALELO al cable, nunca en serie — el cable GPIO → EN sigue entero.
+    </text>
+  </g>
+</svg>
+</div>
+
+<div class="note">
+  <b>Qué resuelve:</b> cuando el ESP32 se cuelga o se resetea, sus GPIO quedan en alta impedancia.
+  La pull-down lleva <code>EN</code> a bajo <b>por hardware</b> y el puente apaga ambos MOSFET — motores
+  detenidos sin depender de que ningún software lo ordene. Con la arquitectura vieja esa capa la daba
+  el Arduino Nano por timeout; con un solo micro, la dan estas resistencias.
+</div>
+
+<div class="banner">
+  <b>Limitación conocida:</b> están montadas en el protoboard del ESP32, no en el header del driver.
+  Protegen "desde el protoboard hacia adelante" — si el cable entre esa fila y el pin del módulo se
+  afloja, ese tramo puntual queda descubierto. Sigue siendo muy superior a no tenerlas.
+</div>
+
+<h2>4. Encoders — mapeo de colores</h2>
+
+<table>
+  <thead><tr><th style="width:16%">Color</th><th style="width:30%">Función</th><th>Conectado a</th></tr></thead>
+  <tbody>
+    <tr><td>Rojo</td><td>Motor power +</td><td>Pestaña del motor (potencia, no señal)</td></tr>
+    <tr><td>Blanco</td><td>Motor power −</td><td>Pestaña del motor (potencia, no señal)</td></tr>
+    <tr><td>Negro</td><td>Encoder GND</td><td>Riel GND lógico</td></tr>
+    <tr><td>Azul</td><td>Encoder VCC</td><td>Riel 3V3 (desde el ESP32)</td></tr>
+    <tr class="enc"><td>Amarillo</td><td>Canal A</td><td><code>GPIO32</code> (M1) / <code>GPIO25</code> (M2)</td></tr>
+    <tr class="enc"><td>Verde</td><td>Canal B</td><td><code>GPIO33</code> (M1) / <code>GPIO26</code> (M2)</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>Por qué los encoders no están en los pines de solo-entrada</b> (34/35/36/39, que sobran): no está
+  confirmado si su salida es push-pull o colector abierto. Si fuera colector abierto necesitaría
+  pull-up, y esos pines <b>no lo tienen interno</b>. Como sobran pines, se priorizó seguridad sobre
+  elegancia. Si se confirma push-pull, se pueden mover y liberar 4 pines full-featured.
+</div>
+
+<h2>5. Generación de PWM (LEDC)</h2>
+
+<div class="stop">
+  <b>En ESP32 no existe <code>analogWrite()</code>.</b> El PWM se genera con el periférico LEDC.
+  Configurar <b>8 bits</b> de resolución para que los topes de duty sigan siendo directamente
+  aplicables sin reconvertir escalas.
+</div>
+
+<pre>ledcAttach(pin, 20000, 8);   // 20 kHz, 8 bits  → duty 0..255
+ledcWrite(pin, duty);</pre>
+
+<div class="note">
+  ⚠️ <b>No usar</b> <code>ledcSetup()</code> + <code>ledcAttachPin()</code> + <code>ledcWrite(canal, …)</code>
+  — es la API del core 2.x, que aparece en la mayoría de los tutoriales pero <b>no existe en el core
+  3.x</b> instalado (esp32:esp32 3.3.11). La nueva trabaja por pin, no por canal.
+  El BTS7960 admite hasta 25 kHz, así que los 20 kHz del proyecto entran sin cambios.
+</div>
+
+<h3 style="font-size:.9rem; margin:20px 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em;">Coast vs. brake</h3>
+
+<pre>COAST    EN = PWM,  IN_a = 1,    IN_b = 0
+BRAKE    EN = 1,    IN_a = PWM,  IN_b = 0</pre>
+
+<p style="font-size:.88rem;">Con el L298N, pasar de coast a brake <b>multiplicó el torque por 2.67</b>
+(medido con balanza, Test 9). Todos los sketches del proyecto venían conmutando en coast sin que
+nadie lo hubiera decidido.</p>
+
+<div class="banner">
+  <b>Hipótesis abierta:</b> hay una inferencia del datasheet de que el BTS7960, con
+  <code>EN=1</code>/<code>LPWM=0</code>, <b>ya hace brake de fábrica</b> — daría esa ganancia gratis.
+  ⚠️ <b>Es inferencia, no medición.</b> Este proyecto ya se equivocó dos veces con ω₀ y dos con K_U por
+  confiarle a una cadena de razonamiento lo que solo cierra la balanza. <b>No usar ni coast ni brake
+  como supuesto en ningún cálculo</b> hasta medirlo con el método del Test 9.
+</div>
+
+<div class="stop">
+  <b>Cap de PWM: el 160 no se hereda.</b> Se calibró contra los BJT del L298N, que se comían varios
+  volts. Con MOSFET (R<sub>ON</sub> 7–10 mΩ) esa caída desaparece y el mismo duty entrega bastante más
+  tensión real al motor. Punto de partida: <b>121</b> (6.0V nominal / 12.6V batería llena × 255).
+</div>
+
+<h2>6. Pines libres y pines a evitar</h2>
+
+<table>
+  <thead><tr><th style="width:26%">Pines</th><th>Situación</th></tr></thead>
+  <tbody>
+    <tr><td><code>5</code>, <code>18</code>, <code>19</code>, <code>23</code></td><td>Libres, full-featured. ⚠️ <code>GPIO5</code> emite un pulso al bootear — no usarlo para nada que mueva un motor.</td></tr>
+    <tr><td><code>34</code>, <code>35</code>, <code>36</code>, <code>39</code></td><td>Libres, <b>solo entrada</b>, sin pull-up/pull-down interno.</td></tr>
+    <tr style="background:var(--danger-bg)"><td><code>6</code>–<code>11</code></td><td><b>Nunca usar</b> — flash SPI interna. Usarlos cuelga el chip.</td></tr>
+    <tr><td><code>0</code>, <code>2</code>, <code>12</code>, <code>15</code></td><td>Bootstrapping. <code>GPIO12</code> en alto al arrancar puede impedir el boot.</td></tr>
+    <tr><td><code>1</code>, <code>3</code></td><td>TX/RX — reservados para debug USB.</td></tr>
+  </tbody>
+</table>
+
+<h3 style="font-size:.9rem; margin:20px 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em;">Ampliación opcional: sensado de corriente</h3>
+
+<p style="font-size:.88rem;">Cada IBT-2 tiene <code>R_IS</code> y <code>L_IS</code>. Atando los dos de un
+módulo se obtiene una señal analógica por motor:</p>
+
+<table>
+  <thead><tr><th style="width:26%">Señal</th><th style="width:20%">Pin sugerido</th><th>Nota</th></tr></thead>
+  <tbody>
+    <tr><td><code>R_IS</code>+<code>L_IS</code> M1</td><td><code>GPIO34</code></td><td rowspan="2">✅ Ambos son <b>ADC1</b>. En el ESP32 <b>los pines de ADC2 no funcionan con el WiFi activo</b>, y este proyecto reporta por AP — usar ADC2 habría dado lecturas rotas justo en las pruebas con el robot en movimiento. Los otros libres (18, 19, 23) no tienen ADC.</td></tr>
+    <tr><td><code>R_IS</code>+<code>L_IS</code> M2</td><td><code>GPIO35</code></td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  Factor de conversión del datasheet oficial: <code>k_ILIS = I_L / I_IS = 8500</code> típico. Con 1kΩ a
+  GND en el pin IS: <code>V_IS = (I_L / 8.5) V</code>. ⚠️ Verificar con multímetro si el módulo ya trae
+  esa resistencia antes de asumir su valor.
+</div>
+
+<footer>
+  Generado 2026-08-29. Fuente de verdad ante cualquier discrepancia: <code>CLAUDE.md</code> y
+  <code>docs/conexiones-registro-pruebas.md</code> (§3, §3.1, §4, §5 y §8).
+  Tabla de verdad y umbrales: <code>docs/BTS7960.pdf</code> (Infineon, Rev 1.1).
+  Complementa a <a href="plano-potencia.html"><code>plano-potencia.html</code></a>; entre los dos
+  reemplazan a <code>obsoleto/plano-electrico.html</code>.
+</footer>
+
+</body>
+</html>

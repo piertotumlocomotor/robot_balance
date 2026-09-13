@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imprimible — Conexiones ESP32 (post-rearmado)</title>
+<meta name="description" content="Hoja única para cablear el ESP32 con 2x BTS7960, MPU6050 y encoders tras el rearmado del chasis: pines, pull-downs y capacitores mínimos.">
+<style>
+  :root{
+    --ink:#181c24; --dim:#4b5563; --faint:#8a93a3; --rule:#c7ccd6; --bg:#fff; --panel:#f4f5f8;
+    --sig:#6b3fa0; --i2c:#0f766e; --enc:#1f7a3d; --pwr:#a1571a; --danger:#b3261e; --danger-bg:#fbeceb;
+    --warn:#8a6d00; --warn-bg:#fbf6dc; --ok:#1f7a3d; --ok-bg:#e9f7ee;
+    --mono:'SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0 auto; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding:16px 20px; font-size:13.5px; line-height:1.32; max-width:900px;
+  }
+  h1{font-size:1.25rem; margin:0 0 2px;}
+  .sub{color:var(--dim); font-size:.75rem; margin-bottom:10px;}
+  h2{
+    font-size:.82rem; text-transform:uppercase; letter-spacing:.05em; color:var(--dim);
+    margin:16px 0 6px; padding-bottom:3px; border-bottom:1.5px solid var(--rule);
+  }
+  table{border-collapse:collapse; width:100%; font-size:.8rem; margin:4px 0;}
+  th,td{border:1px solid var(--rule); padding:3px 7px; text-align:left; vertical-align:top;}
+  th{background:var(--panel); font-weight:700; font-size:.68rem; text-transform:uppercase; letter-spacing:.02em; color:var(--dim);}
+  code{font-family:var(--mono); font-size:.92em;}
+  tr.sig td:first-child{border-left:3px solid var(--sig);}
+  tr.i2c td:first-child{border-left:3px solid var(--i2c);}
+  tr.enc td:first-child{border-left:3px solid var(--enc);}
+  tr.pwr td:first-child{border-left:3px solid var(--pwr);}
+  tr.crit{background:var(--danger-bg);}
+  tr.rec{background:var(--warn-bg);}
+  tr.done{background:var(--ok-bg);}
+
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:0 18px;}
+  .box{border:1px solid var(--rule); border-radius:5px; padding:8px 10px; margin:6px 0; font-size:.78rem;}
+  .box.crit{background:var(--danger-bg); border-color:var(--danger); border-left-width:3px;}
+  .box.rec{background:var(--warn-bg); border-color:var(--warn); border-left-width:3px;}
+  .box b{color:var(--ink);}
+
+  ol,ul{margin:4px 0 4px 1.1rem; padding:0; font-size:.8rem;}
+  li{margin:2px 0;}
+  .check{list-style:none; margin-left:0;}
+  .check li{padding-left:1.3em; position:relative;}
+  .check li::before{content:"☐"; position:absolute; left:0; font-size:1em; color:var(--dim);}
+
+  footer{color:var(--faint); font-size:.65rem; margin-top:16px; padding-top:6px; border-top:1px solid var(--rule);}
+
+  @media print{
+    body{padding:0; font-size:6.2px; line-height:1.05; max-width:none;}
+    h1{font-size:1rem; margin:0 0 1px;}
+    .sub{font-size:.6rem; margin-bottom:3px;}
+    h2{font-size:.64rem; margin:4px 0 2px; padding-bottom:1px;}
+    table{margin:1px 0;}
+    th,td{padding:1px 3px;}
+    .box{padding:2px 5px; margin:2px 0;}
+    ol,ul{margin:1px 0 1px 1rem;}
+    li{margin:0;}
+    .cols{gap:0 10px;}
+    footer{margin-top:2px; padding-top:1px; font-size:.5rem;}
+    th, tr.crit, tr.rec, tr.done, .box.crit, .box.rec,
+    tr.sig td:first-child, tr.i2c td:first-child, tr.enc td:first-child, tr.pwr td:first-child{
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    h2{page-break-after:avoid;}
+    table{page-break-inside:avoid;}
+    @page{size:A4 portrait; margin:3.5mm;}
+  }
+</style>
+</head>
+<body>
+
+<h1>Conexiones ESP32 — hoja de cableado</h1>
+<div class="sub">
+  Post-rearmado · 2× BTS7960 · MPU6050 · encoders M1/M2 · caps casi completos (falta C6, C<sub>en</sub>).
+  Detalle en <code>plano-conexiones-esp32.html</code>.
+</div>
+
+<div class="box crit">
+  <b>Antes de cablear las pull-downs:</b> medir con óhmetro, módulo IBT-2 desconectado, que
+  <code>R_EN</code>/<code>RPWM</code> no tengan pull-up a <code>VCC</code> (tiene que dar abierto). Si
+  hay pull-up, la pull-down de 10kΩ de la tabla de abajo <b>no alcanza</b> — recalcular antes de armar.
+</div>
+
+<div class="box">
+  <b>Cómo contar la "posición":</b> con el USB-C mirando hacia abajo, posición <b>0</b> es la fila más
+  cercana al USB-C en cada lado (izq. 0 = <code>5V</code>, der. 0 = <code>CLK</code>), contando hacia
+  arriba. ✅ <b>Confirmado 2026-09-03 contra foto directa de esta placa</b> (no la reconstrucción vieja)
+  — incluida la zona que había dado un falso positivo de discrepancia (izq. 7-8, der. 10-11). Fuente:
+  <code>pinout-esp32.html</code>.
+</div>
+
+<h2>1 · Señal — ESP32 → driver</h2>
+<table>
+  <thead><tr><th style="width:10%">Pin</th><th style="width:12%">Posición</th><th style="width:26%">Función</th><th style="width:22%">Destino</th><th>Pull-down a GND</th></tr></thead>
+  <tbody>
+    <tr class="sig"><td><code>P27</code></td><td>Izq. 8</td><td><code>EN</code> M1 (R_EN+L_EN atados)</td><td>IBT-2 #1</td><td class="rec"><b>10kΩ — falta instalar</b></td></tr>
+    <tr class="sig"><td><code>P19</code></td><td>Der. 11</td><td><code>RPWM</code> M1 <span style="color:var(--faint)">(no <code>P14</code> — ver nota)</span></td><td>IBT-2 #1</td><td>opcional, defensa extra</td></tr>
+    <tr class="sig"><td><code>P13</code></td><td>Izq. 4</td><td><code>LPWM</code> M1</td><td>IBT-2 #1</td><td>10kΩ</td></tr>
+    <tr class="sig"><td><code>P4</code></td><td>Der. 6</td><td><code>EN</code> M2 (R_EN+L_EN atados)</td><td>IBT-2 #2</td><td class="rec"><b>10kΩ — falta instalar</b></td></tr>
+    <tr class="sig"><td><code>P16</code></td><td>Der. 8</td><td><code>RPWM</code> M2</td><td>IBT-2 #2</td><td>10kΩ</td></tr>
+    <tr class="sig"><td><code>P17</code></td><td>Der. 7</td><td><code>LPWM</code> M2</td><td>IBT-2 #2</td><td>10kΩ</td></tr>
+  </tbody>
+</table>
+<div class="box">
+  ⚠️ <b><code>P14</code> no</b> (Izq. 7): tiene actividad reportada durante el boot del ESP32. Queda
+  <b>libre</b>. Usar <b><code>P19</code></b> (Der. 11) para <code>RPWM</code> M1 — sin bootstrap, sin
+  actividad en boot.
+</div>
+
+<h2>2 · Sensores — ESP32 → I2C / encoders</h2>
+<table>
+  <thead><tr><th style="width:10%">Pin</th><th style="width:12%">Posición</th><th style="width:26%">Función</th><th>Destino</th></tr></thead>
+  <tbody>
+    <tr class="i2c"><td><code>P21</code></td><td>Der. 13</td><td>I2C SDA</td><td>GY-521 SDA</td></tr>
+    <tr class="i2c"><td><code>P22</code></td><td>Der. 16</td><td>I2C SCL</td><td>GY-521 SCL</td></tr>
+    <tr class="enc"><td><code>P32</code></td><td>Izq. 12</td><td>Encoder M1 · canal A</td><td>cable amarillo M1</td></tr>
+    <tr class="enc"><td><code>P33</code></td><td>Izq. 11</td><td>Encoder M1 · canal B</td><td>cable verde M1</td></tr>
+    <tr class="enc"><td><code>P25</code></td><td>Izq. 10</td><td>Encoder M2 · canal A</td><td>cable amarillo M2</td></tr>
+    <tr class="enc"><td><code>P26</code></td><td>Izq. 9</td><td>Encoder M2 · canal B</td><td>cable verde M2</td></tr>
+  </tbody>
+</table>
+<div class="box">
+  Tirada N1→N4 (~25–30 cm): llevar <b>GND dedicado trenzado</b> con SDA/SCL, no usar la estructura como
+  retorno. Arrancar el I2C a <b>100 kHz</b>.
+</div>
+
+<h2>3 · Alimentación</h2>
+<table>
+  <thead><tr><th style="width:10%">Pin / nodo</th><th style="width:12%">Posición</th><th style="width:24%">Función</th><th>Destino</th></tr></thead>
+  <tbody>
+    <tr class="pwr"><td><code>3V3</code></td><td>Izq. 18</td><td>Alimentación sensores</td><td>GY-521 VCC + VCC de los 2 encoders</td></tr>
+    <tr class="pwr"><td><code>5V</code> (VIN)</td><td>Izq. 0</td><td>Entrada riel lógico</td><td>Salida del Buck (≈5.0 V)</td></tr>
+    <tr class="pwr"><td><code>GND</code></td><td>Izq. 1/5/17 o Der. 12/18</td><td>Referencia común</td><td>Riel GND lógico — <b>obligatorio</b>, el GND del USB no reemplaza esto</td></tr>
+    <tr class="pwr"><td>cada IBT-2 <code>VCC</code></td><td>—</td><td>Lógica del driver</td><td>Riel 5V del Buck (no un pin del ESP32)</td></tr>
+    <tr class="pwr"><td>cada IBT-2 <code>B+</code>/<code>B−</code></td><td>—</td><td>Potencia del motor</td><td>Soldadura (nodo estrella real, ~12 V) — nunca al ESP32</td></tr>
+  </tbody>
+</table>
+<div class="box">
+  Hay varios pines <code>GND</code> en la placa (izq. 1, 5, 17 · der. 12, 18) — todos son el mismo
+  nodo internamente. Cualquiera sirve; usá el que quede más cómodo para el cable.
+</div>
+
+<h2>4 · Capacitores — stock real: electrolíticos 1000µF a 16V y 50V, cerámicos 104 (100nF)</h2>
+<table>
+  <thead><tr><th style="width:10%">ID</th><th style="width:20%">Valor a usar</th><th style="width:26%">Ubicación</th><th>Prioridad</th></tr></thead>
+  <tbody>
+    <tr class="done"><td><b>C5</b></td><td>1000µF <b>/50V</b></td><td>Salida 5V del Buck</td><td>✅ instalado</td></tr>
+    <tr class="done"><td><b>C4</b></td><td>1000µF <b>/16V</b></td><td>Fila 30-A (junto al cable VIN en 30-B)</td><td>✅ instalado</td></tr>
+    <tr class="done"><td><b>C1</b></td><td>100µF <b>/25V</b></td><td>Bornera <code>IN</code> del Buck (junto al cable combinado, no en la soldadura)</td><td>✅ instalado</td></tr>
+    <tr class="done"><td><b>C9</b></td><td>104 (100nF)</td><td>Fila 30-A, soldado junto con C4 (mismo empalme, + con +)</td><td>✅ instalado</td></tr>
+    <tr class="done"><td><b>C10/C11</b></td><td>104 (100nF) ×2</td><td>Soldados en el header de cada IBT-2 (<code>VCC</code>↔<code>GND</code>), dupont asegurado</td><td>✅ instalados</td></tr>
+    <tr class="rec"><td><b>C6</b></td><td>104 (100nF)</td><td>3V3 ↔ GND del ESP32</td><td>Recomendado</td></tr>
+    <tr class="rec"><td><b>C<sub>en</sub></b></td><td>104 (100nF) <span style="color:var(--danger)">— no el 101</span></td><td><code>EN</code> (reset) ↔ GND, en el header de cada driver</td><td>Recomendado</td></tr>
+    <tr class="done"><td><b>C2/C3</b></td><td>100nF cerámico</td><td>Pestañas de cada motor</td><td>✅ ya están</td></tr>
+  </tbody>
+</table>
+<div class="box">
+  Solo faltan 2 cerámicos: <b>C6</b> (3V3) y <b>C<sub>en</sub></b> (<code>EN</code>, recomendado
+  soldarlo en el header de cada driver, igual que C10/C11). Todo el resto ya está instalado y soldado.
+</div>
+<div class="box crit">
+  ⏳ <b>Verificar antes de dar C4/C9 por cerrados:</b> continuidad 30-A↔30-C (confirma que quedaron en
+  el mismo nodo que <code>VIN</code>), continuidad riel GND del protoboard ↔ GND lógico común, y que la
+  pata de C1 en la bornera del Buck no aflojó ningún otro conductor de esa misma bornera.
+</div>
+
+<h2>5 · Antes de energizar</h2>
+<div class="cols">
+<ul class="check">
+  <li>Pull-up en <code>R_EN</code>/<code>RPWM</code> del IBT-2 medida — da abierto</li>
+  <li>Continuidad <code>B−</code> ↔ <code>GND</code> del header del IBT-2 medida</li>
+  <li>C5, C4, C1, C9, C10, C11 ✅ instalados — verificar continuidad 30-A↔30-C y riel GND↔GND lógico</li>
+  <li>Pull-downs de <code>EN</code> instaladas (2×, 10kΩ o el valor recalculado)</li>
+  <li>Continuidad 5V↔GND y 3V3↔GND: abierto</li>
+</ul>
+<ul class="check">
+  <li>Switch V+ ON, <code>B+</code> de cada IBT-2 mide ~12V</li>
+  <li><code>VCC</code> de cada IBT-2 mide ~5V</li>
+  <li>Continuidad GND ESP32 ↔ GND del driver (el USB solo no prueba esto)</li>
+  <li>Sentido de giro validado por encoder antes de subir el duty</li>
+  <li>Cap de PWM en firmware: <code>121</code>, no 160</li>
+</ul>
+</div>
+
+<footer>
+  Generado 2026-09-03. Fuente de detalle: <code>plano-conexiones-esp32.html</code>,
+  <code>plano-senales.html</code>, <code>plano-potencia.html</code>,
+  <code>conexiones-registro-pruebas.md</code>. Nada de esto está medido en hardware todavía.
+</footer>
+
+</body>
+</html>
