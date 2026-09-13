@@ -15,6 +15,7 @@
   h1{font-size:1.5rem;margin:0 0 4px;letter-spacing:-.01em;}
   h2{font-size:1.05rem;margin:34px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--rule);}
   h3{font-size:.92rem;margin:20px 0 8px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;}
+  h4{font-size:.88rem;margin:18px 0 6px;color:var(--ink);padding-left:9px;border-left:3px solid var(--logic);}
   .sub{color:var(--dim);font-size:.85rem;margin-bottom:16px;}
   .stop{background:var(--pwr-bg);border:1px solid var(--pwr);border-left-width:4px;border-radius:4px;
         padding:10px 14px;font-size:.85rem;margin:14px 0;color:var(--pwr);}
@@ -102,21 +103,39 @@ de batería hacia cada uno de los dos cables que llegan a la bornera <code>IN</c
   La referencia histórica de las 4 viejas era <b>9.9kΩ</b> medidos.
 </div>
 
-<h3>0.3 — Continuidad punta a punta ESP32 → pin del driver</h3>
+<h3>0.3 — Continuidad punta a punta: ESP32 → cada dispositivo</h3>
 <div class="note">
-  Es el <b>punto 4 del checklist de V1, que quedó pendiente</b>. Medir <b>en el pin del ESP32</b>
-  y <b>en el pin del header del módulo</b>, no en la fila del protoboard — el objetivo es
-  justamente detectar un contacto flojo de protoboard, que es lo que ya arruinó el enlace UART
-  del ESP8266 y el jumper de VIN de §3.2.
+  Es el <b>punto 4 del checklist de V1, que quedó pendiente</b>. Cubre los tres grupos:
+  <b>drivers, encoders y MPU6050</b>.
+  <br><br>
+  <b>Medir siempre en el pin del ESP32 y en el pin del dispositivo</b>, nunca en la fila del
+  protoboard. Todo el punto de la prueba es detectar un contacto flojo de protoboard — es lo que
+  arruinó el enlace UART del ESP8266 (mover el protoboard sin tocar un cable cambiaba el
+  resultado) y el jumper de VIN de §3.2.
 </div>
+
+<div class="stop">
+  <b>Poner el multímetro en cero antes de empezar.</b> Acá se miden <b>cables</b>, y un cable
+  sano da <b>menos de 1–2Ω</b>. Muchos multímetros tienen ~1Ω de offset propio, así que hay que
+  cortocircuitar las puntas, anotar esa lectura y restarla. Sin esto, "1.8Ω" no se distingue de
+  "0.8Ω" y no sabés si el contacto es bueno.
+  <br><br>
+  ⛔ <b>Modo Ω, no continuidad/beep.</b> El beep pita con cualquier cosa por debajo de ~20–50Ω:
+  no distingue un cable sano de un contacto marginal de 15Ω, que es exactamente el tipo de falla
+  que buscamos. Lección 4 del proyecto.
+</div>
+
+<h4>0.3a — Drivers (6 líneas de señal)</h4>
 <table>
-  <tr><th style="width:24%">Pin ESP32</th><th style="width:30%">Pin del módulo</th><th style="width:16%">Esperado</th><th>✓</th></tr>
-  <tr><td><span class="box"></span> <code>P27</code></td><td>IBT-2 #1 <code>R_EN</code> y <code>L_EN</code></td><td>continuidad a <b>los dos</b></td><td></td></tr>
-  <tr><td><span class="box"></span> <b><code>P19</code></b></td><td>IBT-2 #1 <code>RPWM</code></td><td>continuidad</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>P13</code></td><td>IBT-2 #1 <code>LPWM</code></td><td>continuidad</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>P4</code></td><td>IBT-2 #2 <code>R_EN</code> y <code>L_EN</code></td><td>continuidad a <b>los dos</b></td><td></td></tr>
-  <tr><td><span class="box"></span> <code>P16</code></td><td>IBT-2 #2 <code>RPWM</code></td><td>continuidad</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>P17</code></td><td>IBT-2 #2 <code>LPWM</code></td><td>continuidad</td><td></td></tr>
+  <tr><th style="width:22%">Pin ESP32</th><th style="width:30%">Pin del módulo</th><th style="width:18%">Esperado</th><th>Lectura</th></tr>
+  <tr><td><span class="box"></span> <code>P27</code></td><td>IBT-2 <b>#1</b> <code>R_EN</code> y <code>L_EN</code></td><td>&lt;2Ω a <b>los dos</b></td><td></td></tr>
+  <tr><td><span class="box"></span> <b><code>P19</code></b></td><td>IBT-2 <b>#1</b> <code>RPWM</code></td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P13</code></td><td>IBT-2 <b>#1</b> <code>LPWM</code></td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P4</code></td><td>IBT-2 <b>#2</b> <code>R_EN</code> y <code>L_EN</code></td><td>&lt;2Ω a <b>los dos</b></td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P16</code></td><td>IBT-2 <b>#2</b> <code>RPWM</code></td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P17</code></td><td>IBT-2 <b>#2</b> <code>LPWM</code></td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> Riel 5V</td><td><code>VCC</code> de <b>cada</b> IBT-2</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> Soldadura <code>−</code></td><td><code>B−</code> de <b>cada</b> IBT-2</td><td>&lt;2Ω</td><td></td></tr>
 </table>
 <div class="stop">
   <b><code>P14</code> tiene que estar LIBRE.</b> Verificar que no sale ningún cable de ese pin.
@@ -124,18 +143,74 @@ de batería hacia cada uno de los dos cables que llegan a la bornera <code>IN</c
   boot del ESP32 — misma regla que <code>P5</code>: no usarlo para nada que mueva un motor.
 </div>
 
+<h4>0.3b — Encoders (4 canales + alimentación)</h4>
+<p>Medir en el <b>GPIO del ESP32</b> y en el <b>extremo del cable del encoder</b>. Mapeo de
+colores confirmado en §5 del registro.</p>
+<table>
+  <tr><th style="width:22%">Pin ESP32</th><th style="width:34%">Cable del encoder</th><th style="width:16%">Esperado</th><th>Lectura</th></tr>
+  <tr><td><span class="box"></span> <code>P32</code></td><td>M1 · <b>amarillo</b> · canal A</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P33</code></td><td>M1 · <b>verde</b> · canal B</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P25</code></td><td>M2 · <b>amarillo</b> · canal A</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P26</code></td><td>M2 · <b>verde</b> · canal B</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> 3V3 (f.3 / f.12)</td><td><b>azul</b> de <b>los dos</b> encoders</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> Riel <code>−</code></td><td><b>negro</b> de <b>los dos</b> encoders</td><td>&lt;2Ω</td><td></td></tr>
+</table>
+<div class="warn">
+  ⚠️ <b>Los cables rojo y blanco del encoder NO van a ningún GPIO.</b> Comparten pestaña con la
+  potencia del motor. Chequeo de seguridad: <b>ningún GPIO de encoder debe dar continuidad a las
+  pestañas del motor</b> — si la da, un cable de señal se conectó a la potencia, y al energizar le
+  entrarían 12V a un pin del ESP32.
+</div>
+
+<h4>0.3c — MPU6050 (GY-521)</h4>
+<table>
+  <tr><th style="width:22%">Pin ESP32</th><th style="width:34%">Pin del GY-521</th><th style="width:16%">Esperado</th><th>Lectura</th></tr>
+  <tr><td><span class="box"></span> <code>P21</code> (f.17-J)</td><td><code>SDA</code></td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>P22</code> (f.14-J)</td><td><code>SCL</code></td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> 3V3 (f.3 / f.12)</td><td><code>VCC</code></td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> Riel <code>−</code></td><td><code>GND</code></td><td>&lt;2Ω</td><td></td></tr>
+</table>
+<div class="warn">
+  ⚠️ <b>El <code>VCC</code> del MPU es el que más importa de los cuatro.</b> Un GY-521 sin
+  alimentación <b>sigue contestando por I2C</b> — se alimenta por los diodos de protección de
+  SDA/SCL a unos µA, responde <code>WHO_AM_I</code> correcto y falla recién en
+  <code>mpu.begin()</code>. Costó varias horas en §7.13. Esta medición de continuidad, más la
+  de voltaje de la Etapa 2, son las dos formas de no volver a caer.
+</div>
+
+<h4>0.3d — Alimentación del ESP32</h4>
+<table>
+  <tr><th style="width:30%">Desde</th><th style="width:30%">Hasta</th><th style="width:18%">Esperado</th><th>Lectura</th></tr>
+  <tr><td><span class="box"></span> Riel 5V (Buck <code>OUT+</code>)</td><td><code>VIN</code> del ESP32 (f.30-B)</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> Riel <code>−</code></td><td><code>GND</code> del ESP32 (f.1-A)</td><td>&lt;2Ω</td><td></td></tr>
+</table>
+<div class="note">
+  Estas dos son las que ya fallaron una vez cada una: el jumper de <code>VIN</code> sin contacto
+  real (§3.2, daba 0.7V al energizar) y el <code>GND</code> del ESP32 sin unir al riel lógico
+  (§7.6b, motores sin responder mientras el Serial por USB funcionaba perfecto).
+</div>
+
 <h3>0.4 — Ausencia de cruces</h3>
 <p>Pares que <b>tienen que ser nodos distintos</b>. Es la prueba que caza el reordenamiento
 M1/M2 mal hecho, y el equivalente del "ENA vs IN1" que ya se usó en §3.2.</p>
 <table>
-  <tr><th style="width:46%">Par</th><th style="width:20%">Esperado</th><th>Qué detecta si falla</th></tr>
+  <tr><th style="width:46%">Par</th><th style="width:18%">Esperado</th><th>Qué detecta si falla</th></tr>
   <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>LPWM</code> M1</td><td>abierto</td><td>Las dos mitades del puente en corto → el motor nunca gira</td></tr>
   <tr><td><span class="box"></span> <code>RPWM</code> M2 ↔ <code>LPWM</code> M2</td><td>abierto</td><td>Ídem en M2</td></tr>
   <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>RPWM</code> M2</td><td>abierto</td><td><b>Cruce entre lados</b> — el riesgo nuevo del reordenamiento</td></tr>
   <tr><td><span class="box"></span> <code>EN</code> M1 ↔ <code>EN</code> M2</td><td>abierto</td><td>Los dos drivers habilitados por el mismo GPIO</td></tr>
+  <tr><td><span class="box"></span> Canal A ↔ canal B del <b>mismo</b> encoder (×2)</td><td>abierto</td><td>Cuadratura imposible: no se podría detectar sentido de giro</td></tr>
+  <tr><td><span class="box"></span> Canal A de M1 ↔ canal A de M2</td><td>abierto</td><td>Cruce entre encoders — las dos ruedas leerían lo mismo</td></tr>
+  <tr><td><span class="box"></span> <code>SDA</code> ↔ <code>SCL</code></td><td>abierto</td><td>Bus I2C en corto: ningún dispositivo respondería</td></tr>
   <tr><td><span class="box"></span> Cualquier señal ↔ riel 5V</td><td>abierto</td><td>Señal pegada a 5V: el driver arrancaría solo</td></tr>
   <tr><td><span class="box"></span> Riel 5V ↔ riel <code>−</code></td><td>abierto</td><td>Corto de alimentación</td></tr>
+  <tr><td><span class="box"></span> Riel 5V ↔ riel 3V3</td><td>abierto</td><td>5V entrando al riel de 3.3V: mata el MPU y los encoders</td></tr>
 </table>
+<div class="warn">
+  ⚠️ <b><code>SDA</code>/<code>SCL</code> contra 3V3 NO dan abierto</b>, y está bien: el GY-521
+  trae pull-ups en placa, así que vas a leer del orden de <b>unos kΩ</b> (típico 4.7–10kΩ). Si
+  dieran abierto, el módulo no está conectado al 3V3.
+</div>
 
 <h3>0.5 — Riel de 3V3: el valor esperado NO es "abierto"</h3>
 <table>
