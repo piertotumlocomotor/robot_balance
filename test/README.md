@@ -42,6 +42,23 @@ Decisiones de diseño y límites: [`../CLAUDE.md`](../CLAUDE.md).
 > señales y de las pull-downs, con los motores desconectados. Es la Etapa 2.1 de
 > [`../docs/plan-pruebas-pre-energizacion.html`](../docs/plan-pruebas-pre-energizacion.html),
 > el protocolo a correr **antes** de energizar y antes de medir `K_U`.
+>
+> ⚠️ **Corregido 2026-09-14**: su modo `z` (GPIO en alta impedancia, medir ~0V) **no prueba
+> las pull-downs** — una línea flotante medida con multímetro también da ~0V. ✅ **Modo `p`
+> agregado 2026-09-16** (compila, sin flashear): `p` + línea 1–6 pone esa línea en `INPUT_PULLUP`
+> con las otras 5 en bajo; con pull-down la línea queda baja, sin ella sube a ~3.3V (ver
+> `../docs/conexiones-registro-pruebas.md` §7.27).
+> ✅ **Flasheado y corrido 2026-09-21** (placa nueva, montada): modo `z` → las 6 líneas en
+> 0.00–0.01V; modo `p` → `EN` 0.45V, `RPWM`/`LPWM` 0.54–0.56V, `digitalRead` 0 en las 6. Ver §7.28.
+
+> ⭐ **Test 13 (nuevo, 2026-09-16)** — `test13_riel_pullups_mpu_esp32/`: el riel 3V3 del
+> ESP32 mide 3.515V, por encima del máximo de operación del MPU6050 (3.46V). Deja SDA/SCL
+> en `INPUT` sin pull y **sin `Wire.begin`**, con los pines de los drivers en bajo. Si SDA/SCL
+> miden claramente menos que el 3V3, el GY-521 tiene regulador propio y el chip no ve los
+> 3.515V. Ver `../docs/conexiones-registro-pruebas.md` §7.28.
+> ✅ **Corrido 2026-09-21**: SDA/SCL 3.3V contra 3V3 3.35V — no concluye sobre el regulador del
+> GY-521, pero ya no hace falta: el 3.515V era un **desfase de masa** (el GND del ESP32 estaba en
+> un pin que no es masa) y el riel real es 3.35V. Ver §7.29.
 
 **Vigentes (ESP32, FQBN `esp32:esp32:nodemcu-32s`):**
 

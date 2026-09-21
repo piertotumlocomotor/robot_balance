@@ -134,14 +134,18 @@
   <tbody>
     <tr class="pwr"><td><code>3V3</code></td><td>Izq. 18</td><td>Alimentación sensores</td><td>GY-521 VCC + VCC de los 2 encoders</td></tr>
     <tr class="pwr"><td><code>5V</code> (VIN)</td><td>Izq. 0</td><td>Entrada riel lógico</td><td>Salida del Buck (≈5.0 V)</td></tr>
-    <tr class="pwr"><td><code>GND</code></td><td>Izq. 1/5/17 o Der. 12/18</td><td>Referencia común</td><td>Riel GND lógico — <b>obligatorio</b>, el GND del USB no reemplaza esto</td></tr>
+    <tr class="pwr"><td><code>GND</code></td><td>Izq. 5 (fila 25) · Der. 12/18</td><td>Referencia común</td><td>Riel GND lógico — <b>obligatorio</b>, el GND del USB no reemplaza esto. ⛔ <b>Izq. 1 NO es GND</b> aunque la serigrafía lo diga (registro §7.29)</td></tr>
     <tr class="pwr"><td>cada IBT-2 <code>VCC</code></td><td>—</td><td>Lógica del driver</td><td>Riel 5V del Buck (no un pin del ESP32)</td></tr>
     <tr class="pwr"><td>cada IBT-2 <code>B+</code>/<code>B−</code></td><td>—</td><td>Potencia del motor</td><td>Soldadura (nodo estrella real, ~12 V) — nunca al ESP32</td></tr>
   </tbody>
 </table>
 <div class="box">
-  Hay varios pines <code>GND</code> en la placa (izq. 1, 5, 17 · der. 12, 18) — todos son el mismo
-  nodo internamente. Cualquiera sirve; usá el que quede más cómodo para el cable.
+  ⛔ <b>Corregido 2026-09-21 (registro §7.29).</b> Esta nota decía que los <code>GND</code> eran
+  "izq. 1, 5, 17 · der. 12, 18" y que cualquiera servía. <b>Estaba mal:</b> el <b>izq. 1</b> (junto a
+  <code>5V</code>) tiene serigrafía GND pero <b>no es masa</b> (1.4MΩ medido; probable CMD de la
+  flash), y el <b>izq. 17</b> es <code>EN</code> según esta misma tabla (3V3 = izq. 18). Masa
+  verificada: <b>izq. 5</b> (0.8Ω) y <b>der. 18</b>. Der. 12 sin medir.
+  <b>Antes de usar un pin como GND, medirlo en Ω contra otro GND de la misma placa.</b>
 </div>
 
 <h2>4 · Capacitores — stock real: electrolíticos 1000µF a 16V y 50V, cerámicos 104 (100nF)</h2>

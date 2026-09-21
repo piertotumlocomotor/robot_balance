@@ -206,7 +206,7 @@ que ya están confirmadas abajo.
 
 | Señal | Fila (columna) | Nodo / destino |
 |---|---|---|
-| GND ESP32 | 1 (A) | Riel "−" del protoboard (GND lógico común) |
+| GND ESP32 — pin real (izq. 5, entre GPIO12 y GPIO13) | **25 (A)** | Riel "−" del protoboard (GND lógico común). ⛔ **Hasta el 2026-09-21 el jumper estaba en la fila 29**, en el pin junto a VIN que la serigrafía marca GND y **no es masa** (§7.29). El "1" que figuraba antes en esta celda era el conteo del pin desde VIN, no la fila del protoboard |
 | 3V3 (GY-521 + 2 encoders) | 3 (A) | Unida por jumper a fila 12 — mismo nodo de 3V3 |
 | 3V3 (pin del ESP32) + C6 | 12 (A) | Unida por jumper a fila 3. C6 → riel "−" |
 | `EN` (reset ESP32) + C_en | 13 | Fila consecutiva a la 12 (confirma serigrafía de fábrica `3V3`→`EN`). C_en → riel "−" |
@@ -2285,6 +2285,382 @@ cablea lee "pendiente" y decide por su cuenta.
 
 ---
 
+### 7.27 Etapa 0 pre-energización — ✅ cerrada (2026-09-14 / 2026-09-16)
+
+Protocolo: `docs/plan-pruebas-pre-energizacion.html` / `docs/checklist-pruebas-pre-energizacion.md`.
+Batería desconectada, switch en OFF, multímetro en Ω. 0.1–0.3 y 0.4 (parcial) el
+2026-09-14; 0.5–0.7 el 2026-09-16. **Etapa 0 cerrada.** Al terminar, los motores
+quedaron **desconectados de las dos borneras**, como exige la Etapa 1.
+
+#### 0.1 — Polaridad hacia el Buck ✅
+
+XT60 `+` ↔ `IN+` y XT60 `−` ↔ `IN−`: continuidad en los dos.
+
+#### 0.2 — Pull-downs ✅ (con el valor esperado del plan corregido)
+
+| Línea | Fila | Lectura en circuito |
+|---|---|---|
+| `EN` M1 | J10 | 5.97kΩ |
+| `LPWM` M1 | J8 | 7.48kΩ |
+| `RPWM` M1 | J6 | 7.44kΩ |
+| `EN` M2 | A9 | 5.70kΩ |
+| `LPWM` M2 | A7 | 7.45kΩ |
+| `RPWM` M2 | A5 | 7.45kΩ |
+
+El plan esperaba ≈10kΩ. **Estaba mal para una medición en circuito.** Diagnóstico
+sobre `RPWM` M1 (fila 6), aislando de a un elemento, sin batería:
+
+| Condición de la fila 6 | Fila 6 ↔ GND |
+|---|---|
+| Vacía | 2MΩ |
+| Solo el jumper, punta libre en el aire | 1.9MΩ |
+| Solo el jumper, conectado a `RPWM` del IBT-2 #1 | **26kΩ** |
+| Resistencia + jumper + ESP32 + driver (estado normal) | 7.45kΩ |
+| Resistencia sola, fuera del protoboard | 9.9kΩ (bandas marrón-negro-naranja-dorado, 10kΩ ±5%) |
+
+**Conclusión: con el sistema sin energía, la entrada `RPWM` del IBT-2 presenta ≈26kΩ
+hacia GND.** 9.9kΩ ∥ 26kΩ ≈ 7.2kΩ, consistente con lo medido. En `EN` hay dos entradas
+atadas (`R_EN`+`L_EN`, ≈13kΩ): 9.9kΩ ∥ 13kΩ ≈ 5.6kΩ, consistente con 5.70–5.97kΩ. Las 6
+resistencias son de 10kΩ y están unidas a GND. **No hay defecto**: el camino va hacia
+GND, así que no compromete la función de pull-down. No se determinó si ese camino es una
+resistencia del módulo o un diodo de protección que desaparece al energizar — no cambia
+ninguna decisión.
+
+⚠️ **Errores de método durante el diagnóstico, para no repetirlos:**
+- **"Desconectar del header" no aisló el driver**: la punta suelta del Dupont quedó
+  tocando pines vecinos del header y dio 7.46kΩ, igual que conectado. De ahí salió la
+  conclusión falsa de que el driver no aportaba. **Para aislar, la punta tiene que quedar
+  en el aire o encintada.**
+- **Lecturas que suben con el tiempo** (7.45 → 8.27kΩ en una medición) y un **13.45kΩ al
+  invertir las puntas** (imposible para resistencias en paralelo): carga de capacitancias
+  del nodo por la corriente del multímetro. Anotar el valor estable y descargar el nodo
+  entre mediciones. El 8.27kΩ no se reprodujo.
+- Claude propuso dos causas intermedias (diodos del driver por ajuste aritmético, y el
+  ESP32 por eliminación) que se descartaron con datos antes del aislamiento final —
+  lecciones 2 y 8. La que terminó siendo correcta era la primera, pero su "refutación"
+  vino de la prueba contaminada de arriba.
+- El ESP32 se sacó y se volvió a insertar durante el diagnóstico → **se repitió la 0.3
+  completa**, mismos valores.
+
+#### 0.3 — Continuidad punta a punta ✅
+
+Offset de puntas no informado; todas las lecturas quedan muy por debajo del umbral de 2Ω.
+
+| Grupo | Lectura |
+|---|---|
+| Drivers: GPIO27/19/13/4/16/17 ↔ header, riel 5V ↔ `VCC` | 0.4Ω |
+| Soldadura `−` ↔ `B−` | 0.1Ω |
+| Encoders: GPIO32, GPIO25, GPIO26, 3V3, GND | 0.4Ω |
+| Encoder canal B M1 (GPIO33) | **1.0Ω** — el doble que el resto, no es falla; vigilar |
+| MPU6050: SDA, SCL, VCC, GND | 0.4Ω |
+| ESP32: riel 5V ↔ VIN, riel `−` ↔ GND | 0.1Ω |
+
+Repetida tras reinsertar el ESP32 y reconectar `RPWM` M1: mismos valores.
+
+#### 0.4 — Ausencia de cruces ✅ parcial
+
+**Criterio corregido**: el plan esperaba "abierto" en casi todos los pares, y **estaba
+mal**. Todas las señales llegan a GND por su pull-down y la entrada del driver (y las del
+encoder/I2C por sus pull-ups), así que entre dos señales se mide pasando por esos caminos.
+**Un cruce franco da prácticamente 0Ω (<~100Ω); valores en kΩ son normales.**
+
+| Par | Lectura | |
+|---|---|---|
+| `RPWM` M1 ↔ `LPWM` M1 | 14.9kΩ | ✅ |
+| `RPWM` M2 ↔ `LPWM` M2 | 14.9kΩ | ✅ |
+| **`RPWM` M1 ↔ `RPWM` M2** | **14.9kΩ** | ✅ **reordenamiento M1/M2 verificado** |
+| `EN` M1 ↔ `EN` M2 | 11.9kΩ | ✅ |
+| `RPWM` M1 ↔ `LPWM` M2 | 11.9kΩ | Sin cruce. Esperado ~14.9kΩ; probable punta en la fila de `EN` M2. No repetido |
+| Canal A M1 ↔ canal B M1 | 6.6kΩ | ✅ |
+| Canal A M1 ↔ canal B M2 | 6.6kΩ | ✅ |
+| `SDA` ↔ `SCL` | 4.4kΩ | ✅ |
+| Riel 5V ↔ riel `−` | 1.2kΩ | ✅ sin corto |
+| Riel 5V ↔ riel 3V3 | 24kΩ | ✅ sin corto |
+
+**Sin medir** (decisión del usuario, se pasa a 0.5), y qué los cubre:
+
+| Par | Cobertura |
+|---|---|
+| `LPWM` M1 ↔ `LPWM` M2 | Excluido indirectamente: un cruce franco habría puesto las dos pull-downs en paralelo y la 0.2 habría leído ~3.7kΩ en cada una, no 7.48/7.45kΩ |
+| `EN` M1 ↔ riel 5V | Corto franco excluido: `EN` M1 ↔ GND habría leído ≤1.2kΩ (el camino 5V↔GND), no 5.97kΩ. Una fuga de kΩ no se puede detectar en circuito — queda para la Etapa 1 |
+| Canal A M1 ↔ canal A M2 | **No cubierto** → lo detecta el Test 3 de la Etapa 2 (girar las ruedas a mano) |
+| Canal A M2 ↔ canal B M2 | **No cubierto** → ídem, Test 3 (cuadratura) |
+
+⚠️ **Limitación**: en circuito, la 0.4 solo detecta cruces francos, no fugas de decenas
+de kΩ. La fila 6 vacía dio 2MΩ, así que la fuga por flux en el protoboard queda acotada
+al menos en esa fila.
+
+#### 0.5 — Riel de 3V3 ✅ (2026-09-16)
+
+| Medición | Lectura | |
+|---|---|---|
+| 3V3 ↔ riel `−` | 126kΩ | ✅ esperado ≈135kΩ (§7.25) |
+| `EN` del ESP32 (f.13) ↔ riel `−` | 0.7MΩ | ✅ funcionalmente abierto; mismo orden que la fuga del protoboard (fila 6 vacía: 2MΩ) |
+
+#### 0.6 — Masa de los drivers ✅ (2026-09-16)
+
+| Medición | Lectura | |
+|---|---|---|
+| `B−` ↔ soldadura | 0.4Ω | ✅ |
+| `GND` del header ↔ riel `−`, con el cable del header desconectado y aislado | 0.1Ω | ✅ esperado, no es lazo de masa |
+| Cables de `GND`, `R_IS` y `L_IS` en el header | aislados, sin conexión | ✅ |
+
+El 0.1Ω **no es un segundo camino de masa**: dentro del módulo `GND` del header es la misma
+pista que `B−`, y de ahí sigue por la soldadura y el Buck (no aislado, `IN−`↔`OUT−`
+internos) hasta el riel `−`. Es el único camino, y existe con o sin el cable del header.
+Confirma que ese punto solo se puede verificar a ojo, como ya decía el plan.
+
+#### 0.7 — Motores y encoders ✅ (2026-09-16, criterio corregido)
+
+| Condición | Lectura |
+|---|---|
+| M1, `M+`↔`M−` en la bornera, motor conectado | 120Ω, variable |
+| M1, en las pestañas, motor conectado | 10–100Ω al mover la rueda; ~9Ω en reposo |
+| M2, en las pestañas, motor conectado | 57Ω y bajando |
+| M2, en las pestañas, **motor desconectado** | 116 → 111Ω en 30 s; tras una vuelta de rueda, 28Ω |
+| Encoders, `VCC` ↔ `GND` | 26kΩ ✅ sin corto |
+
+**Pasa: ningún motor está abierto.** El valor depende de la posición del rotor (contacto
+escobilla–conmutador) y baja de a poco con la corriente del multímetro. **Con un
+multímetro no se mide la resistencia del bobinado de un motor de escobillas**, así que el
+3.5Ω histórico (§7.1) no sirve como criterio. Criterio corregido en el plan, el PDF y el
+checklist: motor desconectado, rueda quieta, esperar a que se asiente, falla = abierto.
+
+⚠️ **Errores de método durante la medición:**
+- Claude pidió **girar el eje mientras se medía**. Un motor que gira genera tensión y la
+  lectura en Ω deja de valer; de ahí salían los saltos de 10 a 100Ω.
+- Claude atribuyó la bajada lenta de M2 al **bulk de 330µF del IBT-2** sin confirmar si el
+  motor seguía conectado. Con el motor ya desconectado la lectura también cambió, así que
+  el 330µF no es la causa, o no es la única.
+
+**Observación para la Etapa 3**, no conclusión: M2 dio valores más altos que M1, pero no
+son comparables (M1 se midió conectado) y no son datos de `R_m`. Si M2 arranca mal o de
+forma irregular en el Test 11, el primer sospechoso es su contacto de escobillas.
+
+#### Correcciones a los documentos del protocolo (lección 13)
+
+✅ **Aplicadas el 2026-09-14** en `plan-pruebas-pre-energizacion.html` (+ `.pdf`
+regenerado), `checklist-pruebas-pre-energizacion.md`, `CLAUDE.md` y `test/README.md`.
+✅ **Punto 3 en código, 2026-09-16**: modo `p` agregado al Test 12 (`p` + línea 1–6,
+`INPUT_PULLUP` en esa línea y las otras 5 forzadas en bajo, más la lectura interna por
+`digitalRead`). Compila; sin flashear. El criterio de la 0.7 también se corrigió el
+2026-09-16 en el plan, el PDF y el checklist.
+
+1. **0.2**: valor esperado en circuito ≈7.45kΩ (`RPWM`/`LPWM`) y ≈5.7–6kΩ (`EN`). Falla =
+   abierto, o un valor estable claramente menor (dos pull-downs en una `RPWM` darían
+   ~4.3kΩ; en una `EN`, ~3.6kΩ).
+2. **0.4**: criterio de cruce = <~100Ω, no "abierto". Agregar los valores normales.
+3. **Etapa 1.1 y modo `z` del Test 12**: medir "~0V" **no distingue** una pull-down
+   presente de una ausente — una línea flotante medida con un multímetro de ~10MΩ también
+   da ~0V. Reemplazar por una prueba con `INPUT_PULLUP` (pull-up interno débil del ESP32
+   contra la pull-down de 10kΩ: con pull-down la línea queda baja, sin ella sube a ~3.3V).
+   Solo con los motores desconectados.
+
+---
+
+### 7.28 Etapa 1 — primera energización con motores desconectados — ✅ cerrada (2026-09-16 / 2026-09-21)
+
+Motores **desconectados de las dos borneras**, puntas aisladas. En el ESP32 había un
+**sketch desconocido** (todavía no se flasheó el Test 12). USB y batería conectados.
+
+#### Tensiones ✅ (salvo el 3V3)
+
+| Medición | Esperado | Medido | |
+|---|---|---|---|
+| `B+` IBT-2 #1 vs riel `−` | ≈12V | 11.65V | ✅ (~3.9V por celda) |
+| `B+` IBT-2 #2 vs riel `−` | ≈12V | 11.68V | ✅ |
+| `VCC` IBT-2 #1 | ≈5V | 4.98V | ✅ |
+| `VCC` IBT-2 #2 | ≈5V | 4.98V | ✅ |
+| `VIN` ESP32 | 4.8–5.0V | 4.97V | ✅ |
+| 3V3 ESP32, en la fila | 3.2–3.4V | 3.5V | ⚠️ |
+| **3V3 ESP32, en el pin `3V3` de la placa** | 3.2–3.4V | **3.515V** | ⚠️ **abierto, ver abajo** |
+| Temperatura tras >1 min: drivers y Buck | frío/tibio | fríos | ✅ |
+
+El Buck `OUT+` no se midió aparte: `VCC` y `VIN` cuelgan del mismo riel y dan
+4.97–4.98V, así que sostiene la carga.
+
+#### 1.1 parte A — las 6 líneas de señal ✅
+
+| Línea | M1 | M2 |
+|---|---|---|
+| `EN` | 0.30V | 0.40V |
+| `RPWM` | 0.07V | 0.40V |
+| `LPWM` | 0.35V | 0.40V |
+
+**Criterio: menos de 1.1V**, el umbral bajo mínimo garantizado de `IN`/`INH` del BTS7960
+(Infineon, 4.4.6 — ya estaba en §8.2). Las 6 pasan con 0.7V de margen o más: los dos
+puentes se ven deshabilitados por hardware. Primera lectura de `LPWM` M1 anotada como
+0.7V; el usuario la corrigió a 0.35V.
+
+- Ninguna línea supera ~3.5V → **el 3V3 alto no entra por las líneas de los drivers**.
+- Los 0.3–0.4V en vez de 0V son probablemente un pull-up interno activado por el sketch
+  desconocido, contra la pull-down. ⏳ Repetir con el Test 12 en modo `z` (firmware
+  conocido, pines sin pull).
+
+⚠️ **Error de Claude**: afirmó que el proyecto "solo tenía confirmado el umbral alto" y
+fue a buscar el bajo al datasheet. El umbral bajo ya estaba en §8.2; faltaba solo en
+`CLAUDE.md`. Consultar el registro antes de afirmar que un dato no existe.
+
+#### 1.1 parte B — ⏳ pendiente
+
+Test 12 modo `p` (compila, sin flashear).
+
+#### ✅ Resuelto (2026-09-21): riel 3V3 del ESP32 en 3.515V — era un desfase de masa (ver 7.29)
+
+*Se conserva el análisis del 2026-09-16 tal como se hizo. Las hipótesis de abajo (regulador de
+la placa, regulador del GY-521) quedaron superadas: el ESP32 no tenía masa real hacia el riel.*
+
+- **ESP32**: dentro del rango de operación que da Espressif (3.0–3.6V). ⚠️ Dato de
+  datasheet que **no está en `docs/`** — confirmarlo si se vuelve decisivo.
+- **MPU6050**: el máximo de operación del chip es 3.46V según el datasheet de InvenSense.
+  ⚠️ Tampoco está en `docs/`. **Mientras no se resuelva: no correr el Test 0 ni nada que
+  use el MPU, y apagar el switch entre mediciones.**
+- **Descartado**: que la tensión entre por las líneas de los drivers (parte A, ninguna
+  supera ~3.5V).
+- **Sospechoso: el regulador de la placa del ESP32** — encapsulado grande con aleta junto
+  al chip USB-serie. Foto sin marca legible: **no identificado**.
+- **¿El GY-521 tiene regulador propio?** Foto de referencia de internet, que el usuario
+  confirmó que corresponde a su modelo: junto a `VCC` hay un integrado SOT-23-5 con dos
+  cerámicos a los lados, la disposición típica de un LDO. Sin marca legible: **no
+  confirmado**. Las dos resistencias "222" (2.2kΩ) coinciden con `SDA`↔`SCL` = 4.4kΩ de la
+  0.4 — la imagen corresponde a la placa real.
+- **Prueba eléctrica escrita**: `test/test13_riel_pullups_mpu_esp32/` (compila, sin
+  flashear). Deja SDA/SCL en `INPUT` sin pull y sin `Wire.begin`. Si en reposo miden
+  claramente menos que el 3V3, los pull-ups del GY-521 cuelgan de un regulador propio y
+  el chip no ve los 3.515V. Si miden igual que el 3V3, no concluye.
+
+#### Cierre de la Etapa 1 (2026-09-21) — placa nueva, masa corregida (ver 7.29)
+
+Con la masa del ESP32 movida a la fila 25 y el Test 12 flasheado en la placa nueva montada:
+
+| Medición | Antes (masa en el pin falso) | Ahora |
+|---|---|---|
+| 3V3 vs riel `−` | 3.515–3.6V | **3.35V** ✅ |
+| GPIO12 vs riel `−` | 0.8V | **0.018V** ✅ |
+
+**Test 13**: SDA 3.3V y SCL 3.3V contra un 3V3 de 3.35V. No alcanza para saber si el GY-521 tiene
+regulador propio, pero **ya no hace falta**: el riel real (3.35V) está por debajo del máximo del
+MPU6050 (3.46V). **Queda levantada la restricción de no correr el Test 0.**
+
+**1.1 parte A repetida** (Test 12 modo `z`, firmware conocido):
+
+| Línea | M1 | M2 |
+|---|---|---|
+| `EN` | 0.00V | 0.01V |
+| `RPWM` | 0.00V | 0.01V |
+| `LPWM` | 0.00V | 0.01V |
+
+Bajaron de 0.3–0.4V a ~0V. Coincide con el desfase de masa, pero **no aísla** cuánto fue la masa
+y cuánto el cambio de firmware (antes había un sketch desconocido).
+
+**1.1 parte B** (Test 12 modo `p`: pull-up interno en una línea, las otras 5 en bajo):
+
+| Línea | Predicción | Medido | `digitalRead` |
+|---|---|---|---|
+| `EN` M1 | — | 0.45V | 0 ✅ |
+| `EN` M2 | ~0.45V | 0.45V | 0 ✅ |
+| `RPWM` M1 | ~0.55V | 0.54V | 0 ✅ |
+| `LPWM` M1 | ~0.55V | 0.55V | 0 ✅ |
+| `RPWM` M2 | ~0.55V | 0.56V | 0 ✅ |
+| `LPWM` M2 | ~0.55V | 0.55V | 0 ✅ |
+
+Modelo que cierra: la pull-down de 10kΩ en paralelo con las entradas del driver (≈5.8kΩ en
+`EN`, ≈7.45kΩ en `RPWM`/`LPWM`, valores de 0.2) contra un pull-up interno de **≈37kΩ**, inferido
+de `EN` (5.8kΩ → 0.45V). Con ese valor se predijo ~0.55V para `RPWM`/`LPWM` y se midió
+0.54–0.56V. Es del mismo orden que el pull-up típico del ESP32 (≈45kΩ según Espressif; dato que
+no está en `docs/`). Lados M1 y M2 simétricos. Las 6 quedan más de 0.5V por debajo del umbral
+bajo de 1.1V: **las pull-downs sostienen las líneas ante un ESP32 colgado.**
+
+⚠️ **Errores de medición e interpretación en esta parte:**
+- Las primeras lecturas de `EN` en modo `p` dieron 0.00V porque se tomaron **fuera de la ventana
+  de 30 s** (la línea ya había vuelto a bajo). A partir de ese dato, Claude concluyó que la
+  absorción de corriente de las entradas del BTS7960 (Infineon 4.4.6: 25µA típ., 125µA máx. a
+  0.4V) podía sostener la línea sola y que la parte B no aislaba la resistencia. **Retractado**
+  al medir bien (0.45V): el pull-up se ve y la prueba informa.
+- Una lectura se tomó **en Ω con el sistema energizado** (~6kΩ en `EN`, que es el valor de la 0.2).
+  En Ω la lectura no vale con tensión en el circuito: **Ω siempre con la batería desconectada.**
+
+**Etapa 1 cerrada.** Los motores siguen desconectados de las dos borneras.
+
+---
+
+### 7.29 Placa ESP32 dañada y pin "GND" que no es masa — ✅ resuelto (2026-09-21)
+
+**Síntoma**: al flashear el Test 13 con la placa montada, esptool conecta (ESP32-D0WD-V3, MAC
+`68:09:47:9b:f7:e0`) y corre el cargador, pero avisa `Failed to communicate with the flash chip`;
+escribe el bootloader y corta con `Serial data stream stopped`.
+
+#### Secuencia del diagnóstico
+
+1. **Primer intento con el switch en OFF** (solo USB): el USB alimentó el Buck al revés por `VIN`
+   (el LED del Buck titilaba) y el riel se hundió — la falla ya documentada en CLAUDE.md, "Cómo
+   alimentar durante el debug". No era la causa: con la batería encendida falló igual.
+2. **Batería encendida**: mismo error de flash.
+3. **GPIO12** (pin de arranque que fija la tensión de la flash), en la fila 24: **0.8V**. Raro para
+   un pin sin nada conectado, pero se lee como bajo, que es el nivel correcto; no era la causa.
+   El 3V3 había subido a **3.6V**.
+4. **Placa vieja suelta, solo USB**: no entra en modo de carga ni con `IO0`+`EN` a mano, y el
+   monitor Serie no muestra ningún mensaje de arranque. LED de alimentación encendido, 3V3 3.4V,
+   5V 4.9V, `EN` 3.4V → el chip tiene alimentación, no está en reset y no responde: **placa dañada.**
+5. **Placa nueva** (MAC `20:9b:a9:67:89:c0`, mismo pinout verificado por el usuario): flashea bien
+   estando suelta.
+6. **Placa nueva montada**: repite el 3V3 alto y GPIO12 en 0.8V. **Robot energizado sin ESP32**:
+   filas 12 y 3 en 0V → el robot no alimenta el riel de 3V3 por sí solo.
+7. **Placa nueva suelta** (USB, Test 13 corriendo): 3V3 3.3V. **El pin izquierdo junto a `5V`
+   (serigrafía "GND") mide 3.24V contra el GND derecho**, y 3V3 contra ese pin da 0.026V.
+8. **Sin alimentación, en Ω**: ese pin ↔ GND derecho = **1.4MΩ**; el GND izquierdo entre GPIO12 y
+   GPIO13 ↔ GND derecho = **0.8Ω**. **El pin junto a `5V` no es masa.** Por el diseño habitual de
+   estas placas de 38 pines es probablemente `CMD`, del bus SPI de la flash — no confirmado con un
+   datasheet de la placa.
+9. En el robot, **el jumper "GND del ESP32" estaba justamente en ese pin** (fila 29 → riel `−`).
+
+⚠️ **Error de Claude en el camino**: comparó el 3.4V de la placa vieja **ya muerta** (chip sin
+funcionar, casi sin consumo) con el 3.6V de una placa viva montada y concluyó que el robot levantaba
+el riel. La comparación no valía; la referencia correcta fue la placa nueva suelta (3.3V).
+
+#### Causa
+
+El jumper tiraba a masa un pin que no es masa:
+- **Si es `CMD`, el bus de la flash quedaba fijo en bajo** → el ESP32 no puede leer su memoria →
+  error de flasheo. **Causa probable de la muerte de la placa vieja**: su pin peleó contra masa
+  quién sabe cuánto tiempo. Probable, no demostrado.
+- **El ESP32 quedó sin masa real hacia el riel lógico** (solo la del cable USB) → toda su referencia
+  desfasada: 3V3 en 3.515–3.6V, líneas de los drivers en 0.3–0.4V, GPIO12 en 0.8V. Es el mismo tipo
+  de bug que "GND común ESP32↔L298N" (§7.6b), por tercera vez en el proyecto.
+
+**Origen del error**: `docs/pinout-esp32.html` marcaba ese pin como GND, igual que la serigrafía, y
+`plano-imprimible-conexiones-esp32.html` listaba los GND como "izq. 1/5/17" intercambiables: el
+izq. 1 es este pin, y el izq. 17 es `EN` según la misma tabla. **La 0.3d midió riel ↔ "GND del
+ESP32" = 0.1Ω: midió el jumper, no el pin.** Continuidad hacia un pin no prueba qué es ese pin
+(lección 14).
+
+#### Arreglo y verificación
+
+Jumper movido a la **fila 25 (A–E)**, pin izq. 5, entre GPIO12 y GPIO13 (masa real). La fila 29
+queda vacía.
+
+| Medición | Resultado |
+|---|---|
+| Pin GND de la fila 25 ↔ riel `−` (sin batería) | 0.4Ω ✅ |
+| Pin de la fila 29 ↔ riel `−` (sin batería) | 0.6MΩ ✅ abierto |
+| 3V3 vs riel (energizado) | 3.35V ✅ (antes 3.515–3.6V) |
+| GPIO12 vs riel | 0.018V ✅ (antes 0.8V) |
+| ESP32 montado | arranca desde su flash; corre el Test 13 y el Test 12 |
+
+La placa nueva estuvo montada un rato con el pin a masa antes del arreglo. Arranca y corre, sin
+síntomas por ahora.
+
+⚠️ **La 0.3 completa no se repitió** tras reinsertar la placa nueva. Queda cubierta en
+funcionamiento: masa e I2C probados, líneas de los drivers por el Test 12 (modos `z` y `p`). El
+mapeo pin a pin (Test 12, modos 1–6) y los encoders (Test 3) quedan para la Etapa 2.
+
+**Documentos corregidos**: `pinout-esp32.html`, `plano-conexiones-esp32.html` (fila GND y aviso
+sobre la tabla vieja de filas), `plano-imprimible-conexiones-esp32.html`, §3.1b, plan + PDF +
+checklist (0.3d y fila del 3V3), `CLAUDE.md` (pines a evitar, lección 14, estado de los tests),
+`test/README.md`.
+
+---
+
 ## 8. Próximo paso
 
 **Estado al 2026-08-05.** Ya cerrado: Test 1 (MPU, 7.10), Test 2 (motores — riesgo de
@@ -2455,6 +2831,10 @@ Datasheet oficial Infineon BTS7960 Rev 1.1, **4.4.6, pág. 20** (`docs/BTS7960.p
 
 **Son valores absolutos, NO referenciados a V_S.** El peor caso de umbral alto es
 2.15V; los 3.3V del ESP32 quedan **1.15V por encima**. Margen de sobra.
+
+**Umbral bajo, mínimo 1.1V**: cualquier entrada por debajo de 1.1V es nivel bajo
+garantizado. Es el criterio de la Etapa 1.1 parte A (medido 0.07–0.40V en las 6 líneas,
+ver 7.28).
 
 4.4.1, textual: *"The control inputs IN and INH consist of TTL/CMOS compatible schmitt
 triggers... No external driver is needed. The BTS7960 can be interfaced directly to a

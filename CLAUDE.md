@@ -43,12 +43,12 @@ se midió con el L298N. Sube cuando se mida `K_U` con los BTS7960.
 
 Calibración del MPU6050 (bias, escala, ejes) · PPR de encoders 69.1 y mapeo de colores ·
 motor JGB37-520B 6V/793RPM · asimetría M1/M2 (M2 ≈ 81% del torque de M1) · restricciones
-de GPIO del ESP32 · datos de datasheet del BTS7960 · **las 13 lecciones de método**.
+de GPIO del ESP32 · datos de datasheet del BTS7960 · **las 14 lecciones de método**.
 
 ### Dónde vive cada cosa
 
 - **POST / vigente**: este archivo, `docs/conexiones-registro-pruebas.md` (§1–§6, §8, y
-  §7.22–§7.26), y los planos de `docs/` — potencia, señales, conexiones, plan de
+  §7.22–§7.29), y los planos de `docs/` — potencia, señales, conexiones, plan de
   cableado, distribución de niveles, plantillas, ensayo de `m·l`.
 - **PRE / deprecado**: **[`docs/obsoleto/`](docs/obsoleto/README.md)** (con su propio
   README explicando la frontera), más las secciones de este archivo marcadas ⛔ y
@@ -118,7 +118,7 @@ Ingeniero, entusiasta de electrónica con conocimiento intermedio. Explicaciones
 
 - ⛔ **[`docs/obsoleto/`](docs/obsoleto/README.md)** — **carpeta de documentación DEPRECADA (planta vieja).** Tiene su propio README con la frontera PRE/POST y la tabla de qué reemplaza a qué. Contiene: `plano-electrico.html` (potencia+señales con L298N), `plano-protoboard-esp32.html` y `plano-imprimible-esp32.html` (el protoboard de la era L298N, rehecho dos veces desde entonces), `plantilla-imprimible-nivel1-completa.html` / `plantilla-imprimible-nivel1.html` / `plantilla-imprimible-soporte-motor.html` (+ PDFs — arquitecturas de N1 superadas el 2026-08-28) y `reporte_01.html` (instrumental inercial en ESP8266). **Solo para repasar errores, nunca para cablear, construir ni calcular.**
 
-- ⭐ **[`docs/plan-pruebas-pre-energizacion.html`](docs/plan-pruebas-pre-energizacion.html)** — creado 2026-09-13. **El protocolo a ejecutar ANTES de V3 y antes de medir `K_U`.** 4 etapas de lo más barato y seguro a lo más riesgoso, cada prueba con su valor esperado y qué significa si falla: Etapa 0 sin batería (polaridad, las 6 pull-downs, continuidad punta a punta ESP32→driver, ausencia de cruces del reordenamiento M1/M2, `P14` libre), Etapa 1 primera energización **con los motores desconectados** (incluye la verificación de que las 6 señales estén en ~0V, que es lo único que garantiza la protección por hardware), Etapa 2 sensores y mapeo sin mover nada, Etapa 3 primer movimiento con cap 121. Apto para imprimir y para el celular.
+- ⭐ **[`docs/plan-pruebas-pre-energizacion.html`](docs/plan-pruebas-pre-energizacion.html)** — creado 2026-09-13. **El protocolo a ejecutar ANTES de V3 y antes de medir `K_U`.** 4 etapas de lo más barato y seguro a lo más riesgoso, cada prueba con su valor esperado y qué significa si falla: Etapa 0 sin batería (polaridad, las 6 pull-downs, continuidad punta a punta ESP32→driver, ausencia de cruces del reordenamiento M1/M2, `P14` libre), Etapa 1 primera energización **con los motores desconectados** (incluye la prueba funcional de las 6 pull-downs con `INPUT_PULLUP` — ⚠️ corregido 2026-09-14: medir "~0V" no alcanza, una línea flotante también da ~0V; ver registro §7.27), Etapa 2 sensores y mapeo sin mover nada, Etapa 3 primer movimiento con cap 121. Apto para imprimir y para el celular. **Versión impresa: [`plan-pruebas-pre-energizacion.pdf`](docs/plan-pruebas-pre-energizacion.pdf)**; **hoja para anotar a mano: [`checklist-pruebas-pre-energizacion.md`](docs/checklist-pruebas-pre-energizacion.md)** (creados 2026-09-14). Resultados de la Etapa 0 en registro §7.27.
 
 - **[`docs/ensayo-ml-dos-apoyos.html`](docs/ensayo-ml-dos-apoyos.html)** — creado 2026-09-10. Banco de medición de `m·l` por dos apoyos sobre el **chasis rearmado**, con el procedimiento y los chequeos de validez. Complementa §7.17 (método) y §7.23 (resultado) del registro.
 
@@ -141,6 +141,8 @@ Python. ⚠️ **La ubicación cambió el 2026-08-19/20** — ya no vive todo ba
 ### ESP32 — NodeMCU ESP-32S (38 pines), único micro del lazo de control
 
 Chip USB-serie **CP2102** (puede requerir driver CP210x en macOS). Conector USB-C.
+
+⚠️ **Placa reemplazada el 2026-09-21**: la original (MAC `68:09:47:9b:f7:e0`) quedó sin respuesta; la vigente es la MAC `20:9b:a9:67:89:c0`, mismo pinout. **GND del ESP32 al riel lógico: pin izq. 5 (fila 25)**, entre GPIO12 y GPIO13. ⛔ El pin junto a `5V` que la serigrafía marca GND **no es masa** (registro §7.29). **Para flashear, el switch de la batería tiene que estar en ON**: con solo el USB, la placa alimenta el Buck al revés y la flash no responde.
 
 **Pines asignados** (ver `docs/conexiones-registro-pruebas.md` sección 3):
 
@@ -185,6 +187,7 @@ reservados para debug USB.
 | 0, 2, 12, 15 | Bootstrapping. GPIO12 en alto al arrancar puede impedir el boot. |
 | 5 | Emite un pulso al bootear — no usar para nada que mueva un motor. |
 | **14** | **Salida activa durante el boot** (reportado, no en el datasheet oficial). Era `RPWM` M1 y **se movió a GPIO19 por esto**. Queda libre, pero no usarlo para motores. |
+| ⛔ **Pin junto a `5V`, lado izquierdo** (izq. 1, fila 29) | **La serigrafía dice GND y NO es masa**: 1.4MΩ a masa y ~3.3V con la placa suelta (medido 2026-09-21), probable `CMD` del bus de la flash. El GND del ESP32 estuvo ahí y es la **causa probable de la muerte de una placa** (registro §7.29). **La masa real del lado izquierdo es el izq. 5 (fila 25)**, entre GPIO12 y GPIO13. Nunca conectar nada a este pin. |
 
 ⚠️ **Los encoders NO están en los pines de solo-entrada a propósito**: no está
 confirmado si su salida es push-pull o colector abierto. Si fuera colector abierto
@@ -196,7 +199,7 @@ mover y liberar 4 pines full-featured.
 
 - **MPU6050 (GY-521)**: alimentado a **3.3V** desde el pin 3V3 del ESP32.
 - **2× BTS7960 (módulo IBT-2)** — ✅ **driver elegido, decidido 2026-08-29.** Cierra el pendiente que estaba abierto entre BTS7960 / DRV8871 / TB6612FNG. Cada módulo es un puente H completo (2 chips BTS7960B) para **un** motor: dos chips separados por construcción, que es justamente lo que ataca la hipótesis de 7.20 (la caída del 31-36% con carga simultánea sería interna al L298N, que tiene los dos puentes en un mismo die). El chasis N3 ya está cortado con dos huecos de 50×50mm para estos módulos.
-  - ✅ **Lógica 3.3V confirmada por datasheet oficial** (Infineon, 4.4.6): umbral alto de `IN`/`INH` es **2.15V máx, valor absoluto** (no referenciado a V_S). Los 3.3V del ESP32 quedan 1.15V por encima. *"No external driver is needed."* — no hace falta level shifter ni validación en banco para este punto.
+  - ✅ **Lógica 3.3V confirmada por datasheet oficial** (Infineon, 4.4.6): umbral alto de `IN`/`INH` es **2.15V máx, valor absoluto** (no referenciado a V_S). Los 3.3V del ESP32 quedan 1.15V por encima. **Umbral bajo: 1.1V mín** — por debajo de 1.1V la entrada es bajo garantizado; es el criterio de la Etapa 1.1 parte A (registro §8.2 y §7.28). *"No external driver is needed."* — no hace falta level shifter ni validación en banco para este punto.
   - Terminal de potencia: `B−` `B+` `M+` `M−`. Header de señal: `VCC` `R_IS` `R_EN` `RPWM` / `GND` `L_IS` `L_EN` `LPWM`.
   - **Trae 330µF de bulk en placa por módulo** — no hace falta agregar bulk externo por driver.
   - ✅ **Cableado 2026-09-12** (potencia y señal): `B+`/`B−` de cada módulo a la soldadura/nodo estrella, `VCC` al riel de 5V, y las 6 líneas de señal con sus pull-downs — M1 al lado derecho del protoboard (F–J), M2 al izquierdo (A–E). Filas en `docs/conexiones-registro-pruebas.md` 3.1b. ⛔ **El `GND` del header NO se cablea al riel lógico** (es el mismo nodo que `B−`, sería lazo de masa — ver 8.4 y 7.26).
@@ -393,7 +396,9 @@ Cuesta 30 segundos y las habría evitado todas:
    las dos, no alcanza con una.
 3. **El pin lógico del driver mide ~5V** (era "5V" en el L298N, es `VCC` en cada
    IBT-2 — también son dos ahora).
-4. **Continuidad entre un GND del ESP32 y el GND lógico común.**
+4. **Continuidad entre un GND del ESP32 y el GND lógico común.** ⚠️ Medida desde un pin que
+   **sea** GND — verificado en Ω contra otro GND de la misma placa —, no desde el que marca la
+   serigrafía (lección 14, registro §7.29).
 5. **Las pull-downs de seguridad están en los pines correctos** — con el BTS7960 son
    las líneas `EN`, no `RPWM`/`LPWM` (ver pendientes).
 
@@ -1037,6 +1042,16 @@ reglas van juntas acá:
    archivo es **peor** que no tenerlo: da la sensación de que el punto está resuelto
    mientras quien cablea lee "pendiente" y decide solo. Al cerrar una medición, hacer
    `grep` del punto en todo `docs/` y actualizar cada aparición.
+14. **La serigrafía no prueba nada: un GND se verifica con el óhmetro contra otro GND de la
+   misma placa antes de cablearlo.** El pin junto a `5V` del lado izquierdo del ESP32 dice "GND"
+   y **no es masa** (1.4MΩ; probable `CMD` de la flash). El jumper de masa estuvo ahí: el bus de
+   la flash quedó tirado a masa (error de flasheo y causa probable de la muerte de una placa) y
+   el ESP32 quedó sin masa real, con toda su referencia desfasada — 3V3 "en 3.6V", líneas de los
+   drivers en 0.3–0.4V, GPIO12 en 0.8V (2026-09-21, registro §7.29). La 0.3d no lo detectó
+   porque midió la continuidad del **jumper** (riel ↔ pin supuesto GND), que da 0.1Ω aunque el
+   pin no sea masa: **continuidad hacia un pin no prueba qué es ese pin.** Síntoma a reconocer:
+   **varias tensiones "un poco corridas" a la vez apuntan a la referencia**, no a varios
+   componentes fallando juntos.
 
 ## Medición de τ(u) con balanza — método (Test 7, 2026-08-16)
 
@@ -1127,7 +1142,7 @@ indefinido.
 
 - Continuidad global sin batería: ~2.5MΩ (sistema completo), ~1MΩ (sin Buck) — sin evidencia de corto, consistente con fuga normal de electrolíticos en paralelo. ⚠️ Medido antes del rearmado del chasis — no repetido desde entonces.
 - ✅ **Buck reemplazado y calibrado en 5.01V (2026-09-12)** tras su destrucción por polaridad invertida el 2026-09-10. Se cambiaron también `C1`, el capacitor de salida y **el fusible de 10A**, que quedó dañado. El "4.98V" histórico era de la unidad vieja — ya no es referencia. Ver "Buck destruido por polaridad invertida" más arriba; de ese bloque solo queda pendiente repetir V3.
-- ✅ **Capacitores — bulk reconstruido tras el rearmado del chasis (2026-09-03), cerrado el resto (2026-09-12).** El armado físico se rehizo desde cero y se habían perdido todos los electrolíticos (C1, C4, C4b, C5); solo sobrevivieron C2/C3, soldados a los motores y no al protoboard. C1, C4, C5, C9, C10, C11, C6 y C<sub>en</sub> ya están todos reinstalados — el protoboard lógico se rearmó de nuevo en esta sesión (fila 3 = MPU/encoders, fila 12 = 3V3+C6, fila 13 = EN+C_en, fila 1 = GND ESP32, todos al riel "−"). Detalle, stock real disponible y lo que falta en `docs/plano-conexiones-esp32.html` §4 y `docs/conexiones-registro-pruebas.md` §6/7.25 — no repetir la lista siguiente sin consultar esas fuentes, que se actualizan más seguido:
+- ✅ **Capacitores — bulk reconstruido tras el rearmado del chasis (2026-09-03), cerrado el resto (2026-09-12).** El armado físico se rehizo desde cero y se habían perdido todos los electrolíticos (C1, C4, C4b, C5); solo sobrevivieron C2/C3, soldados a los motores y no al protoboard. C1, C4, C5, C9, C10, C11, C6 y C<sub>en</sub> ya están todos reinstalados — el protoboard lógico se rearmó de nuevo en esta sesión (fila 3 = MPU/encoders, fila 12 = 3V3+C6, fila 13 = EN+C_en, **fila 25 = GND ESP32** — pin real; hasta el 2026-09-21 estuvo en la fila 29, que no es masa (registro §7.29) —, todos al riel "−"). Detalle, stock real disponible y lo que falta en `docs/plano-conexiones-esp32.html` §4 y `docs/conexiones-registro-pruebas.md` §6/7.25 — no repetir la lista siguiente sin consultar esas fuentes, que se actualizan más seguido:
   - C1: 100µF/25V — bornera de entrada del Buck (ver más arriba), como conductor separado junto al cable combinado que viene de la soldadura. ⛔ **Instalado 2026-09-03, dañado en el incidente de polaridad invertida (2026-09-10) — reemplazo con repuesto en stock, pendiente para la próxima sesión.**
   - C2/C3: 100nF (motores) — ✅ sobrevivieron el rearmado.
   - C4: 1000µF/16V, protoboard ESP32 fila 30-A (junto al cable de `VIN` en 30-B). ✅ **Instalado (2026-09-03).** ⏳ Pendiente verificar con multímetro continuidad 30-A↔30-C y GND del protoboard↔GND lógico. No expuesto al incidente de polaridad (está del lado lógico, sin alimentación en ese momento).
@@ -1518,7 +1533,8 @@ compila tal cual para ESP32. Estado real:
 | 9 — Torque COAST vs BRAKE | **[`test9_decay_torque_esp32/`](test/test9_decay_torque_esp32/test9_decay_torque_esp32.ino)** | ✅ **Corrido 2026-08-17, extendido 2026-08-18 — revierte el veredicto dos veces.** Ver `docs/conexiones-registro-pruebas.md` 7.19 y 7.20. **17/08**: pasar de coast a brake multiplica el torque por 2.67 (un motor a la vez): θ 2.05°→5.47°, pasa el criterio de 5.0°. **18/08**: con los DOS motores conduciendo a la vez (condición real) el torque cae 31-36% desde la primera lectura (no es térmico) y θ baja a **3.6°** — ya no pasa contra 5.0°. Criterio bajado a 3.0° por decisión del usuario, sin justificar todavía contra la perturbación real. Modos agregados: `e` (sostenido continuo) y `w` (intermitente ON/OFF) para el ensayo térmico. Radio configurable por Serial (`r`, 33 mm) — es del montaje, no del robot. |
 | 10 — Error de colocación manual | **[`test10_pitch_colocacion_esp32/`](test/test10_pitch_colocacion_esp32/test10_pitch_colocacion_esp32.ino)** | ✅ **Corrido (2026-08-19/20).** Perturbación real medida: **media 1.98°, peor caso 3.06° (n=22)** — contra el θ_umbral≈3.65° recalculado con K_U bajo carga simultánea, deja ~20% de margen. Ya cargado en `notebooks/pso_pendulo_invertido.ipynb` como los 3 escenarios de ángulo (1.5°/2.0°/3.0°) y de velocidad (−0.15/0/+0.15 rad/s). ⚠️ Resultado sin transcribir todavía a `docs/conexiones-registro-pruebas.md` (queda en el notebook y en `informes/borrador_entrega.md`). |
 | 11 — Bring-up BTS7960 | [`test11_motores_bts7960_esp32/`](test/test11_motores_bts7960_esp32/test11_motores_bts7960_esp32.ino) | ⏳ **Compila, no flasheado.** ⚠️ **Sus `#define` estaban MAL y se corrigieron el 2026-09-12**: tenía `M1_RPWM = 14` y el cableado real usa **GPIO19** (el 14 tiene salida activa en el boot). Flashearlo como estaba habría dado el síntoma clásico de "el firmware reporta bien y el motor no gira". Ya corregido y recompilado OK. ✅ Nivel lógico 3.3V cerrado por datasheet (8.2). ⏳ Sigue faltando: **las 2 pull-downs en `EN`** (8.4 de este archivo / sección 4 del registro), resolver borneras y masa (8.3/8.4), y el cap de PWM re-derivado a 121 (8.5). **Coast vs. brake en este driver sigue sin medirse** — la inferencia de 8.7 es del datasheet, no de la balanza. |
-| 12 — Mapeo de señales + pull-downs | **[`test12_mapeo_senales_esp32/`](test/test12_mapeo_senales_esp32/test12_mapeo_senales_esp32.ino)** | ⏳ **Escrito y compila (2026-09-13), no flasheado.** Etapa 2.1 de `docs/plan-pruebas-pre-energizacion.html`. Pone **una** línea de señal en alto a la vez (niveles DC, no PWM) para verificar con multímetro que cada GPIO llega al pin correcto del header — cierra el riesgo del reordenamiento M1↔M2 del 2026-09-12 y del cambio `RPWM` M1 de GPIO14 a **GPIO19**. Modo `z`: los 6 GPIO en alta impedancia, **simula un ESP32 colgado** y verifica que las pull-downs sostengan las 6 líneas en ~0V — la única prueba real de esa protección. Imprime `esp_reset_reason()` al arrancar (detecta brownout). Seguro por construcción: una sola línea en alto no puede girar nada según la tabla de verdad del BTS7960. |
+| 12 — Mapeo de señales + pull-downs | **[`test12_mapeo_senales_esp32/`](test/test12_mapeo_senales_esp32/test12_mapeo_senales_esp32.ino)** | ✅ **Flasheado y corrido 2026-09-21** (placa nueva, montada): modo `z` → 6 líneas en 0.00–0.01V; modo `p` → `EN` 0.45V, `RPWM`/`LPWM` 0.54–0.56V (registro §7.28). ⏳ Falta el mapeo con los modos 1–6 (Etapa 2). Etapa 2.1 de `docs/plan-pruebas-pre-energizacion.html`. Pone **una** línea de señal en alto a la vez (niveles DC, no PWM) para verificar con multímetro que cada GPIO llega al pin correcto del header — cierra el riesgo del reordenamiento M1↔M2 del 2026-09-12 y del cambio `RPWM` M1 de GPIO14 a **GPIO19**. Modo `z`: los 6 GPIO en alta impedancia (simula un ESP32 colgado). ⚠️ **Corregido 2026-09-14: el modo `z` NO prueba las pull-downs** — una línea flotante medida con multímetro también da ~0V. ✅ **Modo `p` agregado 2026-09-16** (compila, sin flashear): `p` + línea 1–6 pone esa línea en `INPUT_PULLUP` con las otras 5 en bajo — es la prueba válida de la pull-down (registro §7.27). Imprime `esp_reset_reason()` al arrancar (detecta brownout). Seguro por construcción: una sola línea en alto no puede girar nada según la tabla de verdad del BTS7960. |
+| 13 — Riel de los pull-ups del GY-521 | **[`test13_riel_pullups_mpu_esp32/`](test/test13_riel_pullups_mpu_esp32/test13_riel_pullups_mpu_esp32.ino)** | ✅ **Corrido 2026-09-21.** El 3.515V resultó ser un **desfase de masa**: el GND del ESP32 estaba en un pin que no es masa (registro §7.29). Con la masa corregida el riel da **3.35V**, y SDA/SCL 3.3V — no concluye sobre el regulador del GY-521, pero ya no hace falta. Motivo original: el riel 3V3 del ESP32 mide **3.515V**, por encima del máximo de operación del MPU6050 (3.46V). Deja SDA/SCL en `INPUT` sin pull y **sin `Wire.begin`** (activaría pull-ups internos), con los 6 pines de drivers en bajo. Si SDA/SCL en reposo miden claramente menos que el 3V3, los pull-ups de 2.2kΩ del GY-521 cuelgan de un regulador propio y el chip no ve los 3.515V. Imprime `esp_reset_reason()`. |
 | 6 — Velocidad por encoder | **[`test6_velocidad_esp32/`](test/test6_velocidad_esp32/test6_velocidad_esp32.ino)** | ✅ **Flasheado y validado** (2026-08-14). Modo 1: diagnóstico en lazo abierto, un motor por vez, aísla motor/canal/encoder. Modo 2: control de velocidad PI por rueda realimentado por encoder, sin filtro. De acá salieron la revisión del cap de PWM y la asimetría M1/M2. Topes de seguridad en capas. AP `RobotBalance_Test6`. |
 | 4 — UART ESP↔Nano | `test4_uart_esp/` + `test4_uart_nano/` | **Deprecado** — ya no existe enlace entre chips. Conservar como historial o eliminar. |
 | — | `test4_diag_0x55/` | **Deprecado** — sketch de diagnóstico del enlace eliminado. |
@@ -1534,6 +1550,7 @@ sensor y de la mecánica, no del microcontrolador.
   arduino-cli compile --fqbn esp32:esp32:nodemcu-32s test/<sketch>
   ```
 - **El flasheo lo hace el usuario manualmente**, no Claude Code. Claude Code no debe ejecutar `arduino-cli upload` ni escribir al puerto serie sin pedirlo explícitamente cada vez.
+- ⚠️ **Para flashear con la placa montada, el switch de la batería tiene que estar en ON** (batería + USB). Con solo el USB, la placa alimenta el Buck al revés por `VIN` (el LED del Buck titila), el riel se hunde y la flash no responde (2026-09-21, registro §7.29). Si el flasheo falla con `Failed to communicate with the flash chip` y la batería está en ON, revisar que ningún pin de la flash (el izq. 1 junto a `5V`, `SD2`, `SD3`) esté conectado a nada.
 - **Entorno Python del proyecto**: `.venv/` en la raíz (Python 3.12, ya en `.gitignore`), con `numpy`, `matplotlib` y `reportlab` instalados el 2026-08-16. Hace falta para correr `pso_pendulo_invertido.ipynb`, los scripts de `video_omega0/` y para regenerar el PDF teórico. ⚠️ El Python del sistema **no** tiene ninguno de los tres.
   ```bash
   .venv/bin/python algoritmos_evolutivos_pso/pdf_teoria/generar_teoria.py
@@ -1542,16 +1559,28 @@ sensor y de la mecánica, no del microcontrolador.
 
 ## Estado del diseño / Pendientes abiertos
 
-### 🎯 Próximo paso inmediato (cierre de sesión 2026-09-13)
+### 🎯 Próximo paso inmediato (actualizado 2026-09-16)
 
-**Mañana: correr la Etapa 0 de [`docs/plan-pruebas-pre-energizacion.html`](docs/plan-pruebas-pre-energizacion.html)** — verificación de continuidad con la batería desconectada, antes de energizar nada.
+**Etapa 0 ✅ (registro §7.27) y Etapa 1 ✅ (registro §7.28) cerradas** — [`docs/plan-pruebas-pre-energizacion.html`](docs/plan-pruebas-pre-energizacion.html). Tensiones de potencia y lógica ✅ (`B+` 11.65/11.68V, `VCC` 4.98V, `VIN` 4.97V), **3V3 en 3.35V** ✅, drivers y Buck fríos ✅, las 6 pull-downs verificadas bajo tensión (modo `z`: 0.00–0.01V; modo `p`: 0.45–0.56V; criterio < 1.1V) ✅. **Motores desconectados y puntas aisladas — dejarlos así hasta la Etapa 3.**
+
+⛔ **Incidente 2026-09-21 (registro §7.29): la placa ESP32 original murió.** Causa probable: su GND estaba cableado a un pin que la serigrafía marca GND y **no es masa** (izq. 1, junto a `5V`; probable `CMD` de la flash). **Reemplazada** por una placa nueva (MAC `20:9b:a9:67:89:c0`, mismo pinout), con la **masa movida a la fila 25** (izq. 5, GND real). El "3V3 en 3.515V" que había quedado abierto era ese desfase de masa: resuelto, y **levantada la restricción sobre el Test 0**.
+
+**Próxima sesión — Etapa 2**, con los motores todavía desconectados:
+1. `esp_reset_reason()` al arrancar (lo imprimen el Test 12 y el Test 13): no debe dar `BROWNOUT`.
+2. **Test 0** (scanner I2C): MPU en `0x68`. Y `VCC` del GY-521 con multímetro.
+3. **Test 3** girando las ruedas a mano: los 4 canales cuentan, M1 y M2 con signo opuesto. Anotar las filas de los 4 canales de encoder (pendiente en §3.1b).
+4. **Test 12, modos 1–6**: mapeo pin a pin ESP32 → header de cada IBT-2. Cierra la 0.3 que no se repitió con la placa nueva.
+
+✅ **Tres valores esperados del plan estaban mal y quedaron corregidos el 2026-09-14** en el HTML, el PDF y el checklist (§7.27): la 0.2 en circuito da ≈7.45kΩ (`RPWM`/`LPWM`) y ≈5.7–6kΩ (`EN`), no ≈10kΩ — la entrada del IBT-2 aporta ≈26kΩ a GND; en la 0.4 un cruce es <~100Ω, no se espera "abierto"; y la Etapa 1.1 / modo `z` del Test 12 no distingue una pull-down presente de una ausente — se reemplaza por una prueba con `INPUT_PULLUP`.
+
+✅ **Modo `p` (`INPUT_PULLUP`) agregado al Test 12 el 2026-09-16** — compila, sin flashear. Con el Test 12 cargado se hace toda la 1.1: `z` para la parte A (~0V, fugas) y `p` + línea 1–6 para la parte B (presencia de la pull-down).
 
 El robot está **cableado pero nunca energizado con este cableado**. Orden a seguir, sin saltear:
 
 | # | Paso | Dónde |
 |---|---|---|
-| 1 | **Etapa 0** — continuidad sin batería: polaridad al Buck, las 6 pull-downs, mapa punto a punto ESP32↔drivers/encoders/MPU (§0.3a–d), ausencia de cruces | `plan-pruebas-pre-energizacion.html` |
-| 2 | **Etapa 1** — primera energización **con los motores desconectados**; incluye verificar que las 6 señales midan ~0V | ídem |
+| 1 | ✅ **Etapa 0** (cerrada 2026-09-16) — continuidad sin batería: polaridad al Buck, las 6 pull-downs, mapa punto a punto ESP32↔drivers/encoders/MPU (§0.3a–d), ausencia de cruces, masa, motores | `plan-pruebas-pre-energizacion.html`, registro §7.27 |
+| 2 | ✅ **Etapa 1** (cerrada 2026-09-21, registro §7.28) — primera energización **con los motores desconectados**; incluye la prueba de las 6 pull-downs en dos partes con el Test 12: modo `z` (~0V, fugas) y modo `p` (`INPUT_PULLUP`, presencia) | ídem + `test/test12_mapeo_senales_esp32/` |
 | 3 | **Etapa 2** — `esp_reset_reason()`, Test 0 (I2C), `VCC` del MPU con multímetro, Test 3 girando ruedas a mano, y **Test 12** para el mapeo de señales | ídem + `test/test12_mapeo_senales_esp32/` |
 | 4 | **Etapa 3** — primer movimiento, ruedas en el aire, **cap 121** | ídem |
 | 5 | **V3** del plan de cableado — queda cubierta por la Etapa 1 | `plan-cableado-senales.html` |

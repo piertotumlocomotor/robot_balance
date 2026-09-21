@@ -272,7 +272,7 @@
     <tr class="enc"><td><code>P26</code></td><td>Encoder M2 canal B</td><td>24 (F)</td><td>cable verde M2</td></tr>
     <tr class="pwr"><td><code>3V3</code></td><td>Alimentación de sensores</td><td>⚠️ ahora fila 3 / 12 (ver registro 3.1b)</td><td>GY-521 VCC + VCC de los 2 encoders</td><td>✅ C6 (104, 100nF) instalado 2026-09-12</td></tr>
     <tr class="pwr"><td><code>5V</code> (VIN)</td><td>Entrada del riel lógico</td><td>30 (B: cable a VIN · C: jumper del carril 5V)</td><td>salida del Buck</td><td>✅ C4 (1000µF/16V) instalado en 30-A. Falta C9 (104) — recomendado, §4</td></tr>
-    <tr class="pwr"><td><code>GND</code></td><td>Referencia común</td><td>—</td><td>riel GND lógico</td><td>⚠️ obligatorio: el GND del USB <b>no</b> lo reemplaza (§7.6b del registro)</td></tr>
+    <tr class="pwr"><td><code>GND</code></td><td>Referencia común</td><td><b>25 (A–E)</b> — pin izq. 5, entre GPIO12 y GPIO13</td><td>riel GND lógico</td><td>⚠️ obligatorio: el GND del USB <b>no</b> lo reemplaza (§7.6b del registro). ⛔ <b>El pin junto a <code>5V</code> que la serigrafía marca GND NO es masa</b> (1.4MΩ medido) — el jumper estuvo ahí hasta el 2026-09-21 y es la causa probable de la muerte de una placa (§7.29)</td></tr>
     <tr><td><code>EN</code></td><td>Reset del módulo</td><td>—</td><td>—</td><td>Sumar C<sub>en</sub> 100nF a GND — §4</td></tr>
     <tr><td><code>P34</code> / <code>P35</code></td><td><code>R_IS</code>+<code>L_IS</code> por módulo</td><td>—</td><td>IBT-2 #1 / #2</td><td>Opcional. ADC1: los únicos que funcionan con el WiFi activo</td></tr>
   </tbody>
@@ -490,6 +490,13 @@ protoboard <b>anterior al rearmado</b> — el hallazgo de que este protoboard nu
 y un carril de GND dedicados (algo que el plano viejo no documentaba) sugiere que puede haber una forma
 más simple de ubicarlos, directo sobre esos carriles, en vez de buscar filas libres adyacentes. Queda
 como propuesta a confirmar contra el protoboard real, igual que se hizo recién con C4:</p>
+
+<div class="warn">
+  ⛔ <b>Propuesta vieja, no aplicada (nota del 2026-09-21).</b> Las filas de la tabla siguiente no
+  corresponden al armado vigente: C6, C<sub>en</sub> y C9 quedaron en las filas 12, 13 y 30-A
+  (registro §3.1b y §7.25). En particular, <b>hoy la fila 25 (A–E) es el GND real del ESP32</b>, no
+  3V3. No usar esta tabla para cablear.
+</div>
 
 <table>
   <thead><tr><th style="width:16%">Fila</th><th style="width:22%">Nodo</th><th>Cómo se alimenta</th></tr></thead>

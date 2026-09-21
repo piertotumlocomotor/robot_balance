@@ -89,18 +89,26 @@ de batería hacia cada uno de los dos cables que llegan a la bornera <code>IN</c
 <p>De cada línea de señal al riel <code>−</code>. Valida a la vez que la resistencia está puesta
 <b>y</b> que está en la fila correcta.</p>
 <table>
-  <tr><th style="width:30%">Línea</th><th style="width:16%">Fila / R</th><th style="width:18%">Esperado</th><th>Lectura</th></tr>
-  <tr><td><span class="box"></span> <code>EN</code> M1 (<code>R_EN</code>+<code>L_EN</code>)</td><td>f.10 / J10</td><td>≈10kΩ</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>LPWM</code> M1</td><td>f.8 / J8</td><td>≈10kΩ</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>RPWM</code> M1</td><td>f.6 / J6</td><td>≈10kΩ</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>EN</code> M2</td><td>f.9 / A9</td><td>≈10kΩ</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>LPWM</code> M2</td><td>f.7 / A7</td><td>≈10kΩ</td><td></td></tr>
-  <tr><td><span class="box"></span> <code>RPWM</code> M2</td><td>f.5 / A5</td><td>≈10kΩ</td><td></td></tr>
+  <tr><th style="width:30%">Línea</th><th style="width:16%">Fila / R</th><th style="width:18%">Esperado en circuito</th><th>Lectura</th></tr>
+  <tr><td><span class="box"></span> <code>EN</code> M1 (<code>R_EN</code>+<code>L_EN</code>)</td><td>f.10 / J10</td><td>≈5.7–6kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>LPWM</code> M1</td><td>f.8 / J8</td><td>≈7.45kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M1</td><td>f.6 / J6</td><td>≈7.45kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>EN</code> M2</td><td>f.9 / A9</td><td>≈5.7–6kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>LPWM</code> M2</td><td>f.7 / A7</td><td>≈7.45kΩ</td><td></td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M2</td><td>f.5 / A5</td><td>≈7.45kΩ</td><td></td></tr>
 </table>
 <div class="warn">
-  <b>Cómo leer un resultado raro:</b> <b>abierto</b> = falta la resistencia o está en la fila
-  equivocada. <b>≈5kΩ</b> = hay dos en paralelo (una quedó en una fila que comparte nodo).
-  La referencia histórica de las 4 viejas era <b>9.9kΩ</b> medidos.
+  ⚠️ <b>No se espera ≈10kΩ</b> (corregido 2026-09-14, registro §7.27). Medido en circuito con los
+  drivers conectados, cada entrada del IBT-2 suma <b>≈26kΩ hacia GND</b> en paralelo:
+  9.9kΩ ∥ 26kΩ ≈ 7.45kΩ. <code>EN</code> tiene dos entradas atadas (≈13kΩ), por eso da menos.
+  La resistencia suelta mide 9.9kΩ.
+  <br><br>
+  <b>Cómo medir:</b> la lectura arranca más baja y sube hasta estabilizarse — anotar el valor
+  estable y descargar el nodo entre mediciones.
+  <br><br>
+  <b>Cómo leer un resultado raro:</b> <b>abierto</b> = falta la resistencia, está en la fila
+  equivocada o no llega a GND. <b>Estable y claramente menor</b> = dos pull-downs en paralelo
+  (≈4.3kΩ en <code>RPWM</code>/<code>LPWM</code>, ≈3.6kΩ en <code>EN</code>).
 </div>
 
 <h3>0.3 — Continuidad punta a punta: ESP32 → cada dispositivo</h3>
@@ -182,34 +190,45 @@ colores confirmado en §5 del registro.</p>
 <table>
   <tr><th style="width:30%">Desde</th><th style="width:30%">Hasta</th><th style="width:18%">Esperado</th><th>Lectura</th></tr>
   <tr><td><span class="box"></span> Riel 5V (Buck <code>OUT+</code>)</td><td><code>VIN</code> del ESP32 (f.30-B)</td><td>&lt;2Ω</td><td></td></tr>
-  <tr><td><span class="box"></span> Riel <code>−</code></td><td><code>GND</code> del ESP32 (f.1-A)</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> Riel <code>−</code></td><td><code>GND</code> del ESP32 — <b>pin real, fila 25 (A–E)</b>, entre GPIO12 y GPIO13</td><td>&lt;2Ω</td><td></td></tr>
+  <tr><td><span class="box"></span> Riel <code>−</code></td><td>Pin junto a <code>VIN</code> (fila 29) — ⛔ <b>la serigrafía dice GND y NO es masa</b></td><td><b>abierto</b> (MΩ)</td><td></td></tr>
 </table>
 <div class="note">
   Estas dos son las que ya fallaron una vez cada una: el jumper de <code>VIN</code> sin contacto
   real (§3.2, daba 0.7V al energizar) y el <code>GND</code> del ESP32 sin unir al riel lógico
   (§7.6b, motores sin responder mientras el Serial por USB funcionaba perfecto).
+  <br><br>
+  ⛔ <b>Y falló una tercera vez (2026-09-21, registro §7.29):</b> el jumper de masa estaba en un pin
+  que la serigrafía marca GND y <b>no es masa</b>. Esta prueba lo dejó pasar porque medía el jumper,
+  no el pin. <b>Antes de dar por buena la masa, medir el pin elegido contra otro GND de la misma
+  placa (debe dar &lt;1Ω) — la serigrafía no alcanza.</b>
 </div>
 
 <h3>0.4 — Ausencia de cruces</h3>
 <p>Pares que <b>tienen que ser nodos distintos</b>. Es la prueba que caza el reordenamiento
 M1/M2 mal hecho, y el equivalente del "ENA vs IN1" que ya se usó en §3.2.</p>
-<table>
-  <tr><th style="width:46%">Par</th><th style="width:18%">Esperado</th><th>Qué detecta si falla</th></tr>
-  <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>LPWM</code> M1</td><td>abierto</td><td>Las dos mitades del puente en corto → el motor nunca gira</td></tr>
-  <tr><td><span class="box"></span> <code>RPWM</code> M2 ↔ <code>LPWM</code> M2</td><td>abierto</td><td>Ídem en M2</td></tr>
-  <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>RPWM</code> M2</td><td>abierto</td><td><b>Cruce entre lados</b> — el riesgo nuevo del reordenamiento</td></tr>
-  <tr><td><span class="box"></span> <code>EN</code> M1 ↔ <code>EN</code> M2</td><td>abierto</td><td>Los dos drivers habilitados por el mismo GPIO</td></tr>
-  <tr><td><span class="box"></span> Canal A ↔ canal B del <b>mismo</b> encoder (×2)</td><td>abierto</td><td>Cuadratura imposible: no se podría detectar sentido de giro</td></tr>
-  <tr><td><span class="box"></span> Canal A de M1 ↔ canal A de M2</td><td>abierto</td><td>Cruce entre encoders — las dos ruedas leerían lo mismo</td></tr>
-  <tr><td><span class="box"></span> <code>SDA</code> ↔ <code>SCL</code></td><td>abierto</td><td>Bus I2C en corto: ningún dispositivo respondería</td></tr>
-  <tr><td><span class="box"></span> Cualquier señal ↔ riel 5V</td><td>abierto</td><td>Señal pegada a 5V: el driver arrancaría solo</td></tr>
-  <tr><td><span class="box"></span> Riel 5V ↔ riel <code>−</code></td><td>abierto</td><td>Corto de alimentación</td></tr>
-  <tr><td><span class="box"></span> Riel 5V ↔ riel 3V3</td><td>abierto</td><td>5V entrando al riel de 3.3V: mata el MPU y los encoders</td></tr>
-</table>
 <div class="warn">
-  ⚠️ <b><code>SDA</code>/<code>SCL</code> contra 3V3 NO dan abierto</b>, y está bien: el GY-521
-  trae pull-ups en placa, así que vas a leer del orden de <b>unos kΩ</b> (típico 4.7–10kΩ). Si
-  dieran abierto, el módulo no está conectado al 3V3.
+  ⚠️ <b>Criterio (corregido 2026-09-14, registro §7.27): un cruce da prácticamente 0Ω
+  (&lt;~100Ω). Valores en kΩ son normales</b> — no se espera "abierto", porque todas las señales
+  llegan a GND por sus pull-downs y las entradas del driver, y encoders/I2C por sus pull-ups. La
+  columna "Normal" es lo medido el 2026-09-14.
+</div>
+<table>
+  <tr><th style="width:42%">Par</th><th style="width:14%">Normal</th><th>Qué detecta si da ~0Ω</th></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>LPWM</code> M1</td><td>14.9kΩ</td><td>Las dos mitades del puente en corto → el motor nunca gira</td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M2 ↔ <code>LPWM</code> M2</td><td>14.9kΩ</td><td>Ídem en M2</td></tr>
+  <tr><td><span class="box"></span> <code>RPWM</code> M1 ↔ <code>RPWM</code> M2</td><td>14.9kΩ</td><td><b>Cruce entre lados</b> — el riesgo nuevo del reordenamiento</td></tr>
+  <tr><td><span class="box"></span> <code>EN</code> M1 ↔ <code>EN</code> M2</td><td>11.9kΩ</td><td>Los dos drivers habilitados por el mismo GPIO</td></tr>
+  <tr><td><span class="box"></span> Canal A ↔ canal B del <b>mismo</b> encoder (×2)</td><td>6.6kΩ</td><td>Cuadratura imposible: no se podría detectar sentido de giro</td></tr>
+  <tr><td><span class="box"></span> Canal A de M1 ↔ canal A de M2</td><td>~6.6kΩ</td><td>Cruce entre encoders — las dos ruedas leerían lo mismo</td></tr>
+  <tr><td><span class="box"></span> <code>SDA</code> ↔ <code>SCL</code></td><td>4.4kΩ</td><td>Bus I2C en corto: ningún dispositivo respondería</td></tr>
+  <tr><td><span class="box"></span> Cualquier señal ↔ riel 5V</td><td>kΩ</td><td>Señal pegada a 5V: el driver arrancaría solo</td></tr>
+  <tr><td><span class="box"></span> Riel 5V ↔ riel <code>−</code></td><td>1.2kΩ</td><td>Corto de alimentación</td></tr>
+  <tr><td><span class="box"></span> Riel 5V ↔ riel 3V3</td><td>24kΩ</td><td>5V entrando al riel de 3.3V: mata el MPU y los encoders</td></tr>
+</table>
+<div class="note">
+  <b>Limitación:</b> en circuito esta prueba solo detecta cruces francos, no fugas de decenas de
+  kΩ. Las fugas se verifican energizado, en la Etapa 1.1.
 </div>
 
 <h3>0.5 — Riel de 3V3: el valor esperado NO es "abierto"</h3>
@@ -230,9 +249,19 @@ M1/M2 mal hecho, y el equivalente del "ENA vs IN1" que ya se usó en §3.2.</p>
 <h3>0.7 — Motores y encoders</h3>
 <table>
   <tr><th style="width:40%">Medición</th><th style="width:20%">Esperado</th><th>Si falla</th></tr>
-  <tr><td><span class="box"></span> <code>M+</code> ↔ <code>M−</code> en la bornera de cada driver</td><td><b>≈3.5Ω</b></td><td>Abierto = cable cortado o bornera floja. Es el bobinado, medido en §7.1</td></tr>
-  <tr><td><span class="box"></span> Encoder: <code>VCC</code> ↔ <code>GND</code> de cada uno</td><td>no corto</td><td>Corto = cable pinchado</td></tr>
+  <tr><td><span class="box"></span> <code>M+</code> ↔ <code>M−</code> de cada motor, <b>desconectado de la bornera</b></td><td><b>finito</b> (pocos Ω a ~100Ω)</td><td>Abierto = cable cortado o terminal floja. Medido: M1 ~9Ω, M2 28–116Ω</td></tr>
+  <tr><td><span class="box"></span> Encoder: <code>VCC</code> ↔ <code>GND</code> de cada uno</td><td>no corto</td><td>Corto = cable pinchado. Medido: 26kΩ</td></tr>
 </table>
+<div class="warn">
+  ⚠️ <b>Criterio corregido 2026-09-16 (registro §7.27).</b> Esta prueba detecta un
+  <b>abierto</b>, no un valor exacto. Con un multímetro, un motor de escobillas quieto no da la
+  resistencia del bobinado: domina el contacto escobilla–conmutador, que cambia con la posición
+  del rotor y baja de a poco con la corriente del instrumento. El 3.5Ω histórico no sirve como
+  criterio.
+  <br><br>
+  <b>Cómo medir:</b> motor desconectado, rueda <b>quieta</b> (si gira, el motor genera tensión y
+  la lectura no vale), esperar 15–30 s. Falla = abierto en todas las posiciones del rotor.
+</div>
 
 <h2>Etapa 1 · Primera energización · MOTORES DESCONECTADOS</h2>
 <div class="stage">DESCONECTAR <code>M+</code>/<code>M−</code> DE LAS DOS BORNERAS antes de dar llave</div>
@@ -252,22 +281,40 @@ M1/M2 mal hecho, y el equivalente del "ENA vs IN1" que ya se usó en §3.2.</p>
   <tr><td><span class="box"></span> <code>VCC</code> IBT-2 <b>#2</b></td><td>≈5V</td></tr>
   <tr><td><span class="box"></span> Buck <code>OUT+</code> bajo carga</td><td><b>5.01V</b></td><td>Si cae mucho, el Buck no sostiene el consumo. Valor de la unidad nueva; el 4.98V era la destruida</td></tr>
   <tr><td><span class="box"></span> <code>VIN</code> del ESP32 (f.30-B)</td><td>4.8–5.0V</td><td><b>Una lectura intermedia tipo 0.7V = circuito abierto con fuga</b>, no conexión parcial. Es exactamente cómo falló el jumper de VIN en §3.2</td></tr>
-  <tr><td><span class="box"></span> <code>3V3</code> del ESP32 (f.3/f.12)</td><td>3.2–3.4V</td><td>Si está bajo, revisar el margen de dropout del regulador interno</td></tr>
+  <tr><td><span class="box"></span> <code>3V3</code> del ESP32 (f.3/f.12)</td><td>3.2–3.4V</td><td>Si está bajo, revisar el margen de dropout del regulador interno. ✅ <b>3.35V (2026-09-21).</b> El 3.515–3.6V anterior era un desfase: el GND del ESP32 estaba en un pin que no es masa (registro §7.29). <b>Si vuelve a salir alto, verificar primero la masa del ESP32</b></td></tr>
 </table>
 
 <h3>1.1 — La prueba más importante de todas: las pull-downs en condición real</h3>
 <div class="stop">
-  Con el ESP32 <b>alimentado pero sin firmware de motores corriendo</b> (o directamente sin
-  flashear), medir <b>cada una de las 6 líneas de señal contra GND</b>.
-  <br><br>
-  <b>Las 6 tienen que estar en ~0V.</b> Esto es lo único que garantiza que si el ESP32 se cuelga
-  o se resetea, los motores no arrancan solos. Si alguna mide distinto de 0V, <b>no seguir</b>:
-  la protección por hardware no está funcionando.
+  ⚠️ <b>Corregido 2026-09-14 (registro §7.27): medir "~0V" NO prueba que la pull-down esté.</b>
+  Una línea flotante, sin pull-down, medida con un multímetro de ~10MΩ también da ~0V, porque la
+  entrada del multímetro hace de pull-down. Por eso esta prueba tiene dos partes, y hay que pasar
+  las dos. Si una línea falla en cualquiera, <b>no seguir</b>: la protección por hardware no está
+  funcionando.
 </div>
+
+<p><b>Parte A — ESP32 sin manejar los pines (Test 12 en modo <code>z</code>, o sin firmware de
+motores): detecta fugas hacia 5V/3V3.</b> Una señal que no da ~0V está siendo tirada hacia arriba
+por algo. ⚠️ Si el ESP32 tiene cargado un sketch viejo de motores, una línea en alto puede ser el
+firmware y no una falla.</p>
+<table>
+  <tr><th style="width:40%">Chequeo</th><th style="width:20%">Esperado</th><th>Nota</th></tr>
+  <tr><td><span class="box"></span> Las 6 líneas de señal vs GND</td><td><b>&lt; 1.1V</b> (medido 0.07–0.40V)</td><td>1.1V = umbral bajo mínimo garantizado del BTS7960 (Infineon 4.4.6). Detecta fugas o cruces hacia arriba. No detecta una pull-down ausente</td></tr>
+</table>
+
+<p><b>Parte B — GPIO en <code>INPUT_PULLUP</code>: prueba que la pull-down está.</b> El pull-up
+interno del ESP32 es débil (decenas de kΩ, valor exacto sin confirmar en datasheet) y pierde contra
+la pull-down de 10kΩ. ✅ <b>Modo <code>p</code> del Test 12</b> (agregado 2026-09-16, compila,
+sin flashear): <code>p</code> y después el número de línea (1–6). Pone esa línea en
+<code>INPUT_PULLUP</code> con las otras 5 en bajo, e imprime la lectura interna
+(<code>digitalRead</code>) — el multímetro manda.</p>
+<table>
+  <tr><th style="width:40%">Chequeo</th><th style="width:20%">Esperado</th><th>Nota</th></tr>
+  <tr><td><span class="box"></span> Las 6 líneas con <code>INPUT_PULLUP</code>, de a una, vs GND</td><td><b>claramente bajo</b></td><td>~3.3V = la pull-down no está o no llega a GND</td></tr>
+</table>
 
 <table>
   <tr><th style="width:40%">Chequeo</th><th style="width:20%">Esperado</th><th>Nota</th></tr>
-  <tr><td><span class="box"></span> Las 6 líneas de señal vs GND</td><td><b>~0V</b></td><td>Ver recuadro de arriba</td></tr>
   <tr><td><span class="box"></span> Temperatura tras 1 min: los 2 módulos y el Buck</td><td>frío / tibio</td><td>Algo caliente con los motores desconectados = corriente que no debería existir. Cortar.</td></tr>
 </table>
 
@@ -296,9 +343,10 @@ M1/M2 mal hecho, y el equivalente del "ENA vs IN1" que ya se usó en §3.2.</p>
   no puede hacer girar nada (<code>EN</code> solo = brake; <code>RPWM</code>/<code>LPWM</code> solo
   con <code>EN</code>=0 = stand-by) — igual correrlo con los motores desconectados.
   <br><br>
-  <b>Bonus: el modo <code>z</code> hace la prueba de la Etapa 1.1.</b> Pone los 6 GPIO en alta
-  impedancia (<code>INPUT</code>), o sea <b>simula un ESP32 colgado</b>, y ahí las 6 líneas tienen
-  que medir ~0V sostenidas solo por las pull-downs externas. Medirlas en Ω no prueba eso; esto sí.
+  ⚠️ <b>El modo <code>z</code> NO reemplaza a la Etapa 1.1</b> (corregido 2026-09-14, registro
+  §7.27). Pone los 6 GPIO en alta impedancia (<code>INPUT</code>), pero una línea flotante sin
+  pull-down también mide ~0V con el multímetro. La prueba válida es la parte B de la 1.1
+  (<code>INPUT_PULLUP</code>): modo <code>p</code> del mismo sketch.
   El sketch además imprime <code>esp_reset_reason()</code> al arrancar, que es otro ítem de la
   Etapa 2.
 </div>

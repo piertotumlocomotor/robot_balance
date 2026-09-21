@@ -1,27 +1,34 @@
 /* ============================================================================
    TEST 12 -- Verificacion de mapeo de senales y de las pull-downs
    ESP32 NodeMCU-32S  ·  2x BTS7960 (IBT-2)  ·  creado 2026-09-13
+   Modo 'p' (INPUT_PULLUP) agregado 2026-09-16.
 
    PARA QUE SIRVE
    --------------
-   Etapa 2.1 de docs/plan-pruebas-pre-energizacion.html. Dos cosas que no se
-   pueden verificar de otra forma:
+   Etapas 1.1 y 2.1 de docs/plan-pruebas-pre-energizacion.html:
 
-   1. MAPEO: pone UNA linea de senal en alto a la vez, para que el operador
-      mida con el multimetro en el pin del header del modulo y confirme que
-      llega a donde tiene que llegar. Es la prueba que cierra el riesgo del
-      reordenamiento del 2026-09-12 (M1 paso al lado derecho del protoboard y
-      M2 al izquierdo) y del cambio de RPWM M1 de GPIO14 a GPIO19.
+   1. MAPEO (1-6): pone UNA linea de senal en alto a la vez, para que el
+      operador mida con el multimetro en el pin del header del modulo y
+      confirme que llega a donde tiene que llegar. Es la prueba que cierra el
+      riesgo del reordenamiento del 2026-09-12 (M1 paso al lado derecho del
+      protoboard y M2 al izquierdo) y del cambio de RPWM M1 de GPIO14 a GPIO19.
 
-   2. PULL-DOWNS: modo 'z' pone los 6 GPIO en alta impedancia (INPUT), o sea
-      simula un ESP32 colgado o reseteado. Las 6 lineas tienen que medir ~0V.
-      Eso es lo unico que garantiza que un cuelgue no arranque los motores.
-      Medir en Ohm no alcanza: esto lo prueba en la condicion real.
+   2. PULL-DOWNS (p + 1-6): pone UNA linea en INPUT_PULLUP y las otras 5
+      forzadas en bajo. El pull-up interno del ESP32 es debil y pierde contra
+      la pull-down externa de 10k:
+        - con pull-down  -> la linea queda claramente baja
+        - sin pull-down  -> la linea sube a ~3.3V
+      Es la prueba valida de que la pull-down esta (Etapa 1.1, parte B).
+
+   El modo 'z' (los 6 GPIO en INPUT) se conserva, pero NO prueba las
+   pull-downs: una linea flotante, sin pull-down, medida con un multimetro de
+   ~10M tambien da ~0V. Ver conexiones-registro-pruebas.md 7.27.
 
    POR QUE ES SEGURO
    -----------------
-   Nunca se pone mas de una linea en alto a la vez, y el resto queda forzado
-   en bajo. Por la tabla de verdad del BTS7960 eso no puede hacer girar nada:
+   Nunca hay mas de una linea que pueda estar en alto, y el resto queda
+   forzado en bajo. Por la tabla de verdad del BTS7960 eso no puede hacer
+   girar nada:
 
      - EN alto, RPWM=LPWM=0  ->  puente habilitado con las dos salidas a masa
                                  (brake). Sin torque, el motor no gira.
@@ -80,13 +87,15 @@ const Linea LINEAS[] = {
 };
 const uint8_t N_LINEAS = sizeof(LINEAS) / sizeof(LINEAS[0]);
 
-// Una linea en alto se apaga sola: si el operador se distrae, no queda
-// energizada indefinidamente.
+// Una linea en alto (o en pull-up) vuelve sola al estado seguro: si el
+// operador se distrae, no queda asi indefinidamente.
 const uint32_t TIMEOUT_MS = 30000;
 
-int8_t  activa      = -1;        // indice de la linea en alto, -1 = ninguna
-bool    modoHiZ     = false;
-uint32_t tActiva    = 0;
+int8_t  activa        = -1;      // indice de la linea en alto/pull-up, -1 = ninguna
+bool    modoHiZ       = false;
+bool    modoPullup    = false;
+bool    esperandoLinea = false;  // se apreto 'p', falta elegir la linea
+uint32_t tActiva      = 0;
 uint32_t tUltimoAviso = 0;
 
 // ---------------------------------------------------------------------------
@@ -96,16 +105,18 @@ void todasBajo() {
     pinMode(LINEAS[i].gpio, OUTPUT);
     digitalWrite(LINEAS[i].gpio, LOW);
   }
-  activa  = -1;
-  modoHiZ = false;
+  activa     = -1;
+  modoHiZ    = false;
+  modoPullup = false;
 }
 
 void todasHiZ() {
-  // INPUT = alta impedancia. Simula ESP32 colgado/reseteado: los GPIO quedan
-  // flotando y las pull-downs externas son las que tienen que sostener el bajo.
+  // INPUT = alta impedancia. Simula ESP32 colgado/reseteado. OJO: medir ~0V
+  // aca no prueba la pull-down (el multimetro tambien tira la linea a masa).
   for (uint8_t i = 0; i < N_LINEAS; i++) pinMode(LINEAS[i].gpio, INPUT);
-  activa  = -1;
-  modoHiZ = true;
+  activa     = -1;
+  modoHiZ    = true;
+  modoPullup = false;
 }
 
 void activar(uint8_t idx) {
@@ -126,12 +137,42 @@ void activar(uint8_t idx) {
   Serial.println(F("--------------------------------------------------------"));
 }
 
+void activarPullup(uint8_t idx) {
+  todasBajo();                       // las otras 5 quedan forzadas en bajo
+  pinMode(LINEAS[idx].gpio, INPUT_PULLUP);
+  activa     = idx;
+  modoPullup = true;
+  tActiva    = millis();
+  tUltimoAviso = 0;
+  delay(50);                         // que la linea se asiente antes de leerla
+  int lectura = digitalRead(LINEAS[idx].gpio);
+
+  Serial.println();
+  Serial.println(F("--------------------------------------------------------"));
+  Serial.printf("  PULL-UP INTERNO EN:  %s   (GPIO%u)\n", LINEAS[idx].nombre, LINEAS[idx].gpio);
+  Serial.printf("  MEDIR EN: fila del protoboard %s, contra GND\n", LINEAS[idx].fila);
+  Serial.println(F("  ESPERADO: claramente BAJO (la pull-down de 10k gana)."));
+  Serial.println(F("  FALLA:    ~3.3V -> la pull-down no esta o no llega a GND."));
+  Serial.printf("  Lectura interna (digitalRead): %d\n", lectura);
+  if (lectura == HIGH) {
+    Serial.println(F("  [!] Lee 1: casi seguro FALTA la pull-down. Confirmar con multimetro."));
+  } else {
+    Serial.println(F("  Lee 0: coherente con pull-down presente. El multimetro manda."));
+  }
+  Serial.printf("  Vuelve al estado seguro en %lu s. '0' para volver ya.\n", TIMEOUT_MS / 1000);
+  Serial.println(F("--------------------------------------------------------"));
+}
+
 void estado() {
   Serial.println();
   Serial.println(F("=== ESTADO ==="));
   if (modoHiZ) {
     Serial.println(F("Modo: ALTA IMPEDANCIA (los 6 GPIO en INPUT)."));
-    Serial.println(F("Las 6 lineas deben medir ~0V por las pull-downs externas."));
+    Serial.println(F("OJO: ~0V aca NO prueba las pull-downs. Usar 'p'."));
+  } else if (modoPullup && activa >= 0) {
+    Serial.printf("Modo: PULL-UP en %s (GPIO%u), las otras 5 en BAJO. digitalRead = %d\n",
+                  LINEAS[activa].nombre, LINEAS[activa].gpio,
+                  digitalRead(LINEAS[activa].gpio));
   } else if (activa < 0) {
     Serial.println(F("Modo: TODAS EN BAJO (0V forzado por el ESP32)."));
   } else {
@@ -150,13 +191,14 @@ void menu() {
   Serial.println(F("  4  EN   M2  (GPIO4)   -> IBT-2 #2 R_EN + L_EN"));
   Serial.println(F("  5  RPWM M2  (GPIO16)  -> IBT-2 #2 RPWM"));
   Serial.println(F("  6  LPWM M2  (GPIO17)  -> IBT-2 #2 LPWM"));
+  Serial.println(F("  p  PRUEBA DE PULL-DOWN: 'p' y despues el numero de linea (1-6)"));
   Serial.println(F("  0  todas en BAJO (estado seguro)"));
-  Serial.println(F("  z  ALTA IMPEDANCIA -- prueba de las pull-downs (ver abajo)"));
+  Serial.println(F("  z  alta impedancia (NO prueba las pull-downs, usar 'p')"));
   Serial.println(F("  s  estado    ?  este menu"));
   Serial.println(F("------------------------------------------------------------"));
-  Serial.println(F("  MODO 'z': simula un ESP32 colgado. Las 6 lineas tienen que"));
-  Serial.println(F("  medir ~0V. Si alguna sube, la proteccion por hardware NO"));
-  Serial.println(F("  esta funcionando y no hay que conectar los motores."));
+  Serial.println(F("  MODO 'p': una linea con pull-up interno, las otras 5 en bajo."));
+  Serial.println(F("  Tiene que medir claramente BAJO. Si da ~3.3V, esa pull-down"));
+  Serial.println(F("  no funciona y no hay que conectar los motores."));
   Serial.println(F("============================================================"));
 }
 
@@ -206,8 +248,22 @@ void loop() {
     char c = Serial.read();
     if (c == '\n' || c == '\r' || c == ' ') return;
 
+    if (esperandoLinea) {
+      esperandoLinea = false;
+      if (c >= '1' && c <= '6') {
+        activarPullup((uint8_t)(c - '1'));
+      } else {
+        Serial.println(F("\n[x] Prueba de pull-down cancelada. 'p' para empezar de nuevo."));
+      }
+      return;
+    }
+
     if (c >= '1' && c <= '6') {
       activar((uint8_t)(c - '1'));
+    } else if (c == 'p' || c == 'P') {
+      todasBajo();
+      esperandoLinea = true;
+      Serial.println(F("\n[p] Prueba de pull-down: elegir linea 1-6 (otra tecla cancela)."));
     } else if (c == '0') {
       todasBajo();
       Serial.println(F("\n[OK] Todas en BAJO (estado seguro)."));
@@ -217,9 +273,9 @@ void loop() {
       Serial.println(F("--------------------------------------------------------"));
       Serial.println(F("  ALTA IMPEDANCIA: los 6 GPIO en INPUT."));
       Serial.println(F("  Equivale a un ESP32 colgado o en reset."));
-      Serial.println(F("  MEDIR las 6 lineas contra GND -> TODAS ~0V."));
-      Serial.println(F("  Si alguna sube, NO conectar los motores: las"));
-      Serial.println(F("  pull-downs no estan cumpliendo su funcion."));
+      Serial.println(F("  OJO: que las 6 lineas midan ~0V NO prueba las"));
+      Serial.println(F("  pull-downs (el multimetro tambien tira a masa)."));
+      Serial.println(F("  La prueba valida es 'p'."));
       Serial.println(F("  '0' para volver al estado forzado en bajo."));
       Serial.println(F("--------------------------------------------------------"));
     } else if (c == 's' || c == 'S') {
@@ -231,7 +287,7 @@ void loop() {
     }
   }
 
-  // Apagado automatico de la linea activa.
+  // Vuelta automatica al estado seguro.
   if (activa >= 0) {
     uint32_t t = millis() - tActiva;
     if (t >= TIMEOUT_MS) {
@@ -240,8 +296,9 @@ void loop() {
       todasBajo();
     } else if (t - tUltimoAviso >= 10000) {
       tUltimoAviso = t;
-      Serial.printf("[.] %s sigue en alto (%lu s restantes)\n",
-                    LINEAS[activa].nombre, (TIMEOUT_MS - t) / 1000);
+      Serial.printf("[.] %s sigue %s (%lu s restantes)\n",
+                    LINEAS[activa].nombre, modoPullup ? "en pull-up" : "en alto",
+                    (TIMEOUT_MS - t) / 1000);
     }
   }
 }

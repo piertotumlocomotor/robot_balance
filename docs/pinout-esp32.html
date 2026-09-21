@@ -162,11 +162,11 @@
       <div class="row used"><span class="label">P27</span><span class="gpio">GPIO27</span><span class="fn">ENA · PWM Motor 1</span></div>
       <div class="row used"><span class="label">P14</span><span class="gpio">GPIO14</span><span class="fn">IN1 · dirección M1</span></div>
       <div class="row used"><span class="label">P12</span><span class="gpio">GPIO12</span><span class="fn" style="color:var(--bootstrap)">⚠ bootstrap — no usado, evitar igual</span></div>
-      <div class="row power"><span class="label">GND</span><span class="gpio"></span><span class="fn">tierra</span></div>
+      <div class="row power"><span class="label">GND</span><span class="gpio"></span><span class="fn">tierra ✅ masa real (0.8Ω medido) — es el GND del ESP32 al riel lógico, fila 25</span></div>
       <div class="row used"><span class="label">P13</span><span class="gpio">GPIO13</span><span class="fn">IN2 · dirección M1</span></div>
       <div class="row danger"><span class="label">SD2</span><span class="gpio">SPI flash</span><span class="fn">nunca conectar</span></div>
       <div class="row danger"><span class="label">SD3</span><span class="gpio">SPI flash</span><span class="fn">nunca conectar</span></div>
-      <div class="row power"><span class="label">GND</span><span class="gpio"></span><span class="fn">tierra</span></div>
+      <div class="row danger"><span class="label">"GND"</span><span class="gpio">NO es masa</span><span class="fn">⛔ la serigrafía dice GND, pero mide 1.4MΩ a masa y ~3.3V: probable CMD (bus de la flash). Nunca conectar — registro §7.29</span></div>
       <div class="row power"><span class="label">5V</span><span class="gpio"></span><span class="fn">alimentación desde el Buck</span></div>
     </div>
 
