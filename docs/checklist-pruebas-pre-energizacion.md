@@ -132,9 +132,9 @@ colores en §5 del registro).
 - [ ] **Chequeo de seguridad**: ningún GPIO de encoder da continuidad a las
       pestañas del motor (rojo/blanco del encoder no van a ningún GPIO — si dieran
       continuidad, al energizar le entrarían 12V a un pin del ESP32).
-- [ ] **Filas exactas de los 4 canales de encoder anotadas** (pendiente en §3.1b
-      del registro — completar acá y trasladar al registro):
-      A(___) A(___) A(___) A(___)
+- [x] **Filas exactas de los 4 canales de encoder anotadas** (trasladadas a §3.1b
+      del registro, 2026-10-11, §7.30):
+      M1 A → A(18) · M1 B → A(19) · M2 A → A(20) · M2 B → A(21)
 
 #### 0.3c — MPU6050 (GY-521)
 

@@ -213,9 +213,12 @@ que ya están confirmadas abajo.
 | VIN | 30 (B) | Riel de 5V del Buck |
 | SDA (GPIO21) | 17 (J) | → GY-521 SDA |
 | SCL (GPIO22) | 14 (J) | → GY-521 SCL |
-| Encoders (los 4 canales) | columna A | Filas exactas sin especificar todavía |
+| Encoder M1 canal A (GPIO32) | 18 (A) | Leídas por el usuario 2026-10-11 (§7.30); coinciden con el orden de pines del lado izquierdo desde 3V3 en f.12 |
+| Encoder M1 canal B (GPIO33) | 19 (A) | ídem |
+| Encoder M2 canal A (GPIO25) | 20 (A) | ídem |
+| Encoder M2 canal B (GPIO26) | 21 (A) | ídem |
 | `VCC` de cada BTS7960 | — | Riel de 5V del Buck (mismo que VIN) |
-| `GND` de cada BTS7960 (header de señal) | — | Riel "−" (GND lógico común) — ⏳ **pendiente medir continuidad `B−`↔`GND` del header en cada módulo antes de confirmar esta unión como definitiva** (ver 8.4) |
+| `GND` de cada BTS7960 (header de señal) | — | ⛔ **NO se cablea al riel lógico.** V1 (2026-09-10) midió continuidad `B−`↔`GND` del header en los dos módulos: son la misma pista, y cablear los dos armaría un lazo de masa (8.4, 7.26). La referencia común la da la estrella vía `B−` |
 
 **Señal de motores — reordenada 2026-09-12: M1 al lado derecho (F–J), M2 al lado
 izquierdo (A–E) del protoboard**, para simplificar el tendido físico de cables hacia
@@ -2658,6 +2661,60 @@ mapeo pin a pin (Test 12, modos 1–6) y los encoders (Test 3) quedan para la Et
 sobre la tabla vieja de filas), `plano-imprimible-conexiones-esp32.html`, §3.1b, plan + PDF +
 checklist (0.3d y fila del 3V3), `CLAUDE.md` (pines a evitar, lección 14, estado de los tests),
 `test/README.md`.
+
+### 7.30 Etapa 2 — sensores y mapeo de señales, motores desconectados — ✅ cerrada (2026-10-11)
+
+Placa ESP32 nueva (MAC `20:9b:a9:67:89:c0`), batería en ON + USB, batería en **11.5V** (media
+carga; recargar antes de medir `K_U`). Motores desconectados toda la sesión.
+
+| Prueba | Resultado | Criterio |
+|---|---|---|
+| `esp_reset_reason()` (Test 12) | `1` = `POWERON`, boot `SPI_FAST_FLASH_BOOT` | no `BROWNOUT` ✅ |
+| Test 0, barrido I2C | solo `0x68`, igual a 100 y 400 kHz, 3 barridos | MPU en `0x68` ✅ |
+| Test 0, `WHO_AM_I` | `0x68` | `0x68` ✅ |
+| `VCC` del GY-521 (vs su `GND`) | **3.247V**, LED encendido | alimentado de verdad, < 3.46V ✅ |
+| Test 3, PPR M1 (10 vueltas) | −692 → **69.2** | 69.1 ±1 ✅ |
+| Test 3, PPR M2 (10 vueltas) | +700 → **70.0** | 69.1 ±1 ✅ |
+| Signo hacia adelante | M1 **negativo**, M2 **positivo** | opuestos (espejo) ✅ |
+| Canal B, ida y vuelta ~2 vueltas | M1 **−2**, M2 **0** | ≈0 ✅ |
+| Acople entre encoders | el otro contador en 0 en cada prueba | 0 ✅ |
+
+**Test 12, modos 1–6** (mapeo pin a pin, punta negra en el riel "−", punta roja en el header):
+
+| Línea | GPIO | Pin del header | Medido |
+|---|---|---|---|
+| `EN` M1 | 27 | IBT-2 #1 `R_EN` / `L_EN` | 3.20 / 3.20V |
+| `RPWM` M1 | **19** | IBT-2 #1 `RPWM` | 3.18V |
+| `LPWM` M1 | 13 | IBT-2 #1 `LPWM` | 3.20V |
+| `EN` M2 | 4 | IBT-2 #2 `R_EN` / `L_EN` | 3.18 / 3.18V |
+| `RPWM` M2 | 16 | IBT-2 #2 `RPWM` | 3.17V |
+| `LPWM` M2 | 17 | IBT-2 #2 `LPWM` | 3.17V |
+
+Todas ~1V por encima del umbral alto del BTS7960 (2.15V). La caída de ~0.1V respecto de 3.3V es la
+carga de la pull-down de 10kΩ en paralelo con la entrada del IBT-2 (≈26kΩ, §7.27). Medir solo el pin
+destino alcanza para detectar cruces: con las otras 5 líneas forzadas en bajo, un intercambio da ~0V
+en el destino y un corto da una tensión intermedia. **Quedan validados los dos cambios de cableado
+que nunca se habían probado**: el reordenamiento M1 (F–J) / M2 (A–E) y `RPWM` M1 en GPIO19.
+**GPIO14 confirmado sin cable a ojo.** Esto cierra la 0.3 que no se repitió con la placa nueva (§7.29).
+
+**Filas de los encoders** (cierra el pendiente de §3.1b): M1 A → f.18, M1 B → f.19, M2 A → f.20,
+M2 B → f.21, columna A. Coinciden con el orden del lado izquierdo de la placa contando desde 3V3 en
+la f.12 (3V3, EN, SVP, SVN, 34, 35, **32, 33, 25, 26**), que a su vez es coherente con GND en la f.25
+y `CMD` en la f.29.
+
+#### Notas de la sesión
+
+- **El Test 3 es de la era L298N** (`IN1` = GPIO14, PWM sobre `EN`). Su **Fase 0** sirve sin
+  cambios; **las Fases 1 y 2 no sirven para los BTS7960** y no se deben usar. El texto de su página
+  sobre la Fase 1 ("mismo signo") es anterior a la corrección del montaje en espejo.
+- **Primeras 2 "vueltas" a ojo dieron 68 pulsos**: era una vuelta. Contar vueltas sin marca no
+  sirve; el PPR se mide con marca en la rueda.
+- **El signo solo no prueba el canal B**: con B cortado el pin queda en alto por `INPUT_PULLUP` y el
+  contador da siempre el mismo signo. La prueba de ida y vuelta no depende del punto de vista.
+- **Flujo continuo de "…in cable." en el Serial Monitor del Arduino IDE antes de reflashear**: con el
+  Test 12 recién flasheado no se repitió. Sin explicar; probablemente firmware viejo o el monitor
+  del IDE. **El Serial Monitor del IDE retiene el puerto y se reabre solo** al reabrir el IDE: con
+  el panel abierto, `arduino-cli upload`/`monitor` fallan con "port busy".
 
 ---
 

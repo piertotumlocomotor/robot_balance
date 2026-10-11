@@ -1,6 +1,6 @@
 /*
   ========================================================================
-  TEST 11 — Bring-up del driver BTS7960 (reemplazo del L298N)
+  TEST 11 — Bring-up del driver BTS7960 (reemplazo del L298N) — Etapa 3
   ========================================================================
 
   POR QUE EXISTE
@@ -10,206 +10,110 @@
   dos motores a la vez es interna al L298N -- que tiene los dos puentes en
   un mismo die. El BTS7960 es un puente H SIMPLE: cada modulo mueve UN motor,
   asi que la arquitectura queda con dos chips separados por construccion.
-  Hacen falta los 2 modulos para operacion basica -- no hay uno de repuesto
-  con lo comprado.
 
-  Este sketch es SOLO bring-up: verificar que el cableado nuevo esta bien y
-  que los motores responden en el sentido correcto, antes de pasar a medir
-  nada con la balanza. Es el mismo paso que test2_motores_esp32 cumplio para
-  el L298N -- saltearlo ya costo horas de diagnostico tres veces en este
-  proyecto (ver CLAUDE.md, "Checklist antes de cualquier prueba que mueva
+  Este sketch es SOLO bring-up (Etapa 3 de docs/plan-pruebas-pre-energizacion):
+  verificar que los motores responden, en que sentido, y que el signo del
+  encoder es coherente con el sentido comandado -- antes de medir nada con
+  la balanza. Saltear este paso ya costo horas de diagnostico tres veces en
+  este proyecto (CLAUDE.md, "Checklist antes de cualquier prueba que mueva
   motores").
 
   ------------------------------------------------------------------------
-  ⚠️⚠️ PINES: ASUNCION, NO DATO CONFIRMADO -- REVISAR ANTES DE FLASHEAR
+  PINES — VERIFICADOS EN FUNCIONAMIENTO (registro §7.30, 2026-10-11)
 
-  Se reutilizan los mismos 3 GPIO por motor que tenia el L298N, reinterpre-
-  tados para el BTS7960:
+      M1 (derecho):   EN=GPIO27 (R_EN+L_EN)  RPWM=GPIO19  LPWM=GPIO13
+      M2 (izquierdo): EN=GPIO4  (R_EN+L_EN)  RPWM=GPIO16  LPWM=GPIO17
+      Encoders:       M1 A/B = GPIO32/33     M2 A/B = GPIO25/26
 
-      L298N          ->  BTS7960 (este sketch)
-      ENA (M1)       ->  EN  (R_EN + L_EN del modulo, atados juntos)
-      IN1 (M1)       ->  RPWM
-      IN2 (M1)       ->  LPWM
-      (mismo patron para M2 con ENB/IN3/IN4)
-
-  Si el cableado real de mañana usa otros pines, CAMBIAR los #define de
-  abajo antes de compilar -- no asumir que esto ya esta bien.
-
-      M1: EN=GPIO27  RPWM=GPIO19  LPWM=GPIO13   <-- RPWM es 19, NO 14
-      M2: EN=GPIO4   RPWM=GPIO16  LPWM=GPIO17
-
-  R_IS/L_IS (salidas analogicas de corriente de cada modulo) NO estan
-  cableadas en este test. Podrian conectarse a pines de solo-entrada (34,
-  35, 36, 39 -- libres segun CLAUDE.md) en una version futura para medir
-  corriente en vivo, pero eso queda para despues del bring-up.
+  RPWM M1 es GPIO19, NO 14: el 14 tiene salida activa durante el boot.
 
   ------------------------------------------------------------------------
-  ⚠️⚠️ SEGURIDAD: EL CAP DE 160 DEL L298N NO APLICA ACA
+  PULL-DOWNS DE SEGURIDAD — INSTALADAS Y VERIFICADAS (§7.28)
 
-  El L298N (BJTs) tenia una caida de conduccion importante, ya caracteriza-
-  da en 7.19/7.20. El BTS7960 (MOSFETs, RDSon en el orden de mOhm) va a
-  tener MUCHA menos caida -- el mismo duty entrega mas tension real al
-  motor de lo que entregaba el L298N.
+  6 pull-downs de 10k (EN, RPWM, LPWM de cada motor). Si el ESP32 se cuelga
+  o se resetea, sus GPIO quedan en alta impedancia y EN cae a bajo: el
+  BTS7960 apaga los dos MOSFET ("To deactivate both switches, the INH pin
+  has to be set to low", datasheet Infineon). Igual: mano en el switch de V+.
 
-  ⚠️ Version anterior de este comentario tenia un ERROR: proponia 130
-  llamandolo "conservador" (130/255*12.6V = 6.42V, YA arriba del nominal
-  de 6V -- no era conservador, estaba mal calculado). Con el L298N el 160
-  seguia dando menos de 6V reales porque el driver se comia varios volts;
-  con el BTS7960 esa caida es chica, asi que la cuenta ingenua SI aplica:
+  ------------------------------------------------------------------------
+  CAP DE PWM: 121, NO EL 160 DEL L298N
+
+  El L298N (BJTs) se comia varios volts; el BTS7960 (MOSFET, R_ON de mOhm)
+  casi no, asi que la cuenta ingenua SI aplica:
 
       MAX_DUTY_ABSOLUTO = 121   (6.0V / 12.6V bateria llena x 255 = 121.4)
 
-  Es, sin buscarlo, el mismo 121 que fue el primer calculo del L298N (misma
-  fisica; ahi resulto ser demasiado conservador porque el driver comia
-  varios volts que este calculo ignoraba -- aca no hay esa caida que
-  compense el error, asi que el numero SI es el limite real).
-
-  Subir este tope es una decision aparte, para despues de: (1) confirmar
-  sentido y comportamiento correctos a duty bajo, (2) medir la relacion
-  duty-tension real de este driver (multimetro) o el torque con la balanza
-  (como el Test 9) -- recien ahi, con la caida de conduccion real medida
-  (que no es exactamente cero), se puede subir el cap con criterio.
+  Subirlo es una decision aparte, despues de medir tau(u) con la balanza en
+  este driver.
 
   ------------------------------------------------------------------------
-  ⚠️⚠️ SIN PULL-DOWNS DE SEGURIDAD EN LOS PINES NUEVOS TODAVIA
+  COAST vs BRAKE EN ESTE DRIVER: TODAVIA NO SE SABE (registro 8.7)
 
-  Plan propuesto (mas simple que el del L298N, ver "PLAN DE CABLEADO" abajo):
-  UN pull-down de 10k en cada linea EN (2 en total, contra los 4 que tenia
-  el L298N en IN1-4). En el BTS7960, EN en bajo deshabilita el puente
-  completo sin importar el estado de RPWM/LPWM -- alcanza con protegerlo a
-  el. ⚠️ Asuncion basada en el comportamiento tipico de estos drivers
-  (IR2104-like); confirmar contra el datasheet del modulo especifico
-  comprado antes de confiar en esto como unica proteccion.
-
-  ESTE test corre SIN esa proteccion todavia instalada. Mano en el switch
-  de V+, no dejar el robot andando sin supervision.
-
-  ------------------------------------------------------------------------
-  PLAN DE CABLEADO PROPUESTO (a confirmar antes de armar)
-
-  Opcion elegida: R_EN y L_EN de cada modulo ATADOS JUNTOS a un solo pin
-  "EN" del ESP32 (mismo patron que ENA/ENB del L298N) -- mas simple de
-  cablear y de programar que manejarlos por separado, y no hay necesidad
-  identificada de controlarlos de forma independiente para este proyecto.
-
-  Reusa exactamente los mismos 6 GPIO que manejaban el L298N -- las mismas
-  seis lineas del protoboard, solo cambia a que pin del modulo nuevo llega
-  cada una:
-
-      Motor 1 (derecho)              Motor 2 (izquierdo)
-      ESP32 GPIO27 -> EN (R_EN+L_EN) ESP32 GPIO4  -> EN (R_EN+L_EN)
-      ESP32 GPIO19 -> RPWM           ESP32 GPIO16 -> RPWM
-      ESP32 GPIO13 -> LPWM           ESP32 GPIO17 -> LPWM
-
-  Ventaja de reusar los mismos pines: el cambio de cableado es "desconectar
-  del L298N, conectar al BTS7960", sin tocar filas del protoboard del lado
-  del ESP32.
-
-  CONFIRMADO CONTRA docs/bts7960_datasheet.pdf (modulo HW-039, 2026-08-19):
-
-  1. Alimentacion logica: pin VCC pide +5V APARTE, no se deriva de la
-     potencia. Sale del mismo riel del Buck que ya alimenta el ESP32 y el
-     GY-521 -- mismo patron que el "5V logico" del L298N (ver CLAUDE.md).
-     GND del modulo comun con el ESP32 (mismo bug-class que "GND comun
-     ESP32-L298N" en CLAUDE.md: confirmar continuidad, no asumir).
-  2. R_EN + L_EN atados juntos es la practica estandar segun el propio
-     fabricante del modulo -- el plan de EN unico por motor queda
-     respaldado, no es solo una suposicion mia.
-  3. PWM hasta 25 kHz soportado -- los 20 kHz que ya usa el proyecto entran
-     sin cambios.
-  4. Corriente continua recomendada: 20A. Muy por encima de lo que este
-     motor va a pedir -- la duda de dimensionamiento por corriente que
-     tenia el TB6612FNG no aplica aca.
-
-  CONFIRMADO CONTRA docs/BTS7960.pdf (datasheet OFICIAL Infineon del chip
-  BTS7960B, no la ficha del modulo, 2026-08-19):
-
-  5. EN/INH en bajo apaga los dos MOSFETs -- textual: "To deactivate both
-     switches, the INH pin has to be set to low. No external driver is
-     needed." El plan de pull-down en EN queda CONFIRMADO, no es mas una
-     suposicion.
-  6. R_IS: factor de conversion EXACTO, k_ILIS = I_L / I_IS = 8500 (tipico).
-     Con resistencia externa de 1k en IS: V_IS = (I_L / 8.5A) V. Verificar
-     si el modulo HW-039 ya trae esa resistencia instalada (continuidad/
-     resistencia con multimetro) antes de asumir el valor de R_IS.
-     Candidatos de pin: GPIO34 (M1), GPIO35 (M2) -- libres, solo-entrada,
-     con ADC.
-
-  ------------------------------------------------------------------------
-  ⚠️ HALLAZGO SIN CONFIRMAR: el esquema RPWM/LPWM=0 estandar PODRIA YA SER
-  "BRAKE" por diseño del chip, no "coast" como el L298N
-
-  El datasheet describe "active freewheeling": el lado modulado por PWM
-  enciende activamente su MOSFET inferior en el tramo OFF (no depende del
-  diodo), y el lado fijo en IN=0 mantiene su MOSFET inferior encendido de
-  forma continua (IN no es tri-state por si solo, solo INH lo es). Con
-  RPWM modulado y LPWM fijo en 0: durante el tramo OFF de RPWM, LOS DOS
-  terminales del motor (M+ y M-) quedan atados a GND al mismo tiempo --
-  eso es la definicion de brake (motor en cortocircuito), no coast.
-
-  Si esto se confirma, el BTS7960 daria de entrada la ganancia que en el
-  L298N hizo falta ganar moviendo el PWM de ENABLE a IN (Test 9, 7.19) --
-  gratis, sin truco de firmware.
-
-  ⚠️⚠️ ES UNA INFERENCIA DEL DATASHEET, NO UNA MEDICION. Este proyecto ya
-  aprendio (dos veces con ω₀, dos veces con K_U, ver CLAUDE.md "Lecciones
-  de metodo") a no confiarle a una cadena de razonamiento lo que solo mide
-  la balanza. Se verifica con el mismo metodo del Test 9 apenas este driver
-  este cableado -- no asumir coast ni brake de antemano en ningun calculo.
-
-  ------------------------------------------------------------------------
-  ⚠️⚠️ COAST vs BRAKE EN ESTE DRIVER: TODAVIA NO SE SABE
-
-  El Test 9 (7.19) encontro que el L298N hacia coast (fast decay) con el
-  PWM sobre ENABLE, y que pasar a brake (PWM sobre IN, EN fijo) multiplico
-  el torque 2.67x. El comportamiento del BTS7960 durante el tramo OFF del
-  PWM (que hacen internamente sus drivers IR2104-like cuando RPWM baja)
-  NO esta confirmado -- varia segun el modulo especifico. Esto se mide
-  despues, con la balanza, igual que se hizo con el L298N. Este sketch NO
+  Hay una inferencia del datasheet ("active freewheeling") de que con RPWM
+  modulado y LPWM fijo en 0 el tramo OFF ya es brake. Es inferencia, no
+  medicion: se verifica con la balanza (metodo del Test 9). Este sketch NO
   responde esa pregunta.
 
   ------------------------------------------------------------------------
   QUE HACE ESTE SKETCH
 
-  Aplica un pulso CORTO (2 s, no continuo) al motor elegido, a un duty bajo
-  por defecto, y se detiene solo. Pensado para: confirmar sentido de giro,
-  confirmar que no hay comportamiento raro (chirridos, tironeos, olor),
-  antes de subir el duty. Incluye un modo "los dos juntos" para empezar a
-  escuchar/sentir de forma cualitativa si aparece algo parecido a la caida
-  de carga simultanea del L298N (7.20) -- esto es solo un chequeo auditivo
-  de arranque, NO reemplaza medir con la balanza.
+  Pulso CORTO (2 s) al motor elegido, a duty bajo, y se detiene solo. 'x'
+  durante el pulso lo corta en el acto. Al terminar informa, de los dos
+  encoders, el delta de pulsos y las RPM del ultimo medio segundo, y traduce
+  el signo a sentido fisico con la convencion medida en §7.30:
 
-  CABLEADO: ver el bloque de arriba. Motor 1 = derecho, Motor 2 = izquierdo
-  (misma convencion que el resto del proyecto).
+      girando hacia ADELANTE del robot:  M1 cuenta NEGATIVO, M2 POSITIVO
+
+  Modo 'a': los dos motores juntos. Por el montaje en espejo, el mismo
+  sentido electrico hace girar las ruedas en sentidos opuestos respecto del
+  robot -- con las ruedas en el aire no importa; apoyado, giraria en el lugar.
+
+  Al arrancar imprime esp_reset_reason(): si un pulso resetea la placa, el
+  arranque siguiente dice si fue BROWNOUT (el riel se hundio con la corriente
+  de los motores).
   ========================================================================
 */
 
 #include <Arduino.h>
+#include "soc/gpio_reg.h"
 
-// --- Pines -- CONFIRMADOS contra el cableado real (2026-09-12) ------------
-// M1_RPWM es GPIO19, NO GPIO14: el 14 tiene salida activa durante el boot
-// (reportado, no en el datasheet oficial) y cae bajo la misma regla que GPIO5
-// de este proyecto -- no usarlo para nada que mueva un motor. Analisis en
-// docs/plano-conexiones-esp32.html seccion 3; filas en 3.1b del registro.
 const uint8_t M1_EN = 27, M1_RPWM = 19, M1_LPWM = 13;
 const uint8_t M2_EN = 4,  M2_RPWM = 16, M2_LPWM = 17;
+const uint8_t ENC_M1_A = 32, ENC_M1_B = 33;
+const uint8_t ENC_M2_A = 25, ENC_M2_B = 26;
 
-// --- PWM -------------------------------------------------------------------
 const uint32_t PWM_FREQ_HZ  = 20000;
 const uint8_t  PWM_RES_BITS = 8;
 
-// Tope derivado para ESTE driver -- no es el 160 del L298N (ver cabecera).
-// 6.0V / 12.6V bateria llena x 255 = 121.4 -- corregido, no es "conservador
-// de mas": con MOSFETs la caida de conduccion es chica, esta cuenta ingenua
-// SI es aproximadamente el limite real.
 const uint8_t MAX_DUTY_ABSOLUTO = 121;
-uint8_t duty = 40;     // arranque bien bajo, primer encendido de driver sin verificar
+uint8_t duty = 40;     // arranque bien bajo; subir de a poco
 
-const uint16_t PULSO_MS = 2000;   // pulso corto, no continuo, para bring-up
+const uint32_t PULSO_MS   = 2000;
+const uint32_t VENTANA_MS = 500;    // RPM sobre el final del pulso, ya sin el arranque
+const float    PPR        = 69.1f;  // pulsos/vuelta, decodificacion 1x (§7.11, §7.30)
 
 uint8_t motor   = 1;
 int8_t  sentido = 1;
 
+// --- Encoders ---------------------------------------------------------------
+volatile int32_t encM1 = 0;
+volatile int32_t encM2 = 0;
+
+// digitalRead() vive en flash: no es seguro desde una ISR. El registro si.
+static inline int IRAM_ATTR fastRead(uint8_t pin) {
+  if (pin < 32) return (REG_READ(GPIO_IN_REG) >> pin) & 0x1;
+  return (REG_READ(GPIO_IN1_REG) >> (pin - 32)) & 0x1;
+}
+
+// Cuadratura 1x: flanco de subida de A, el nivel de B da el sentido (igual que el Test 3).
+void IRAM_ATTR isrM1() { encM1 += fastRead(ENC_M1_B) ? -1 : 1; }
+void IRAM_ATTR isrM2() { encM2 += fastRead(ENC_M2_B) ? -1 : 1; }
+
+void leerEncoders(int32_t& e1, int32_t& e2) {
+  noInterrupts(); e1 = encM1; e2 = encM2; interrupts();
+}
+
+// --- Motores ----------------------------------------------------------------
 void configurarPines() {
   pinMode(M1_EN, OUTPUT);   pinMode(M2_EN, OUTPUT);
   digitalWrite(M1_EN, LOW); digitalWrite(M2_EN, LOW);   // arranca deshabilitado
@@ -217,9 +121,14 @@ void configurarPines() {
   ledcAttach(M1_LPWM, PWM_FREQ_HZ, PWM_RES_BITS); ledcWrite(M1_LPWM, 0);
   ledcAttach(M2_RPWM, PWM_FREQ_HZ, PWM_RES_BITS); ledcWrite(M2_RPWM, 0);
   ledcAttach(M2_LPWM, PWM_FREQ_HZ, PWM_RES_BITS); ledcWrite(M2_LPWM, 0);
+
+  pinMode(ENC_M1_A, INPUT_PULLUP); pinMode(ENC_M1_B, INPUT_PULLUP);
+  pinMode(ENC_M2_A, INPUT_PULLUP); pinMode(ENC_M2_B, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ENC_M1_A), isrM1, RISING);
+  attachInterrupt(digitalPinToInterrupt(ENC_M2_A), isrM2, RISING);
 }
 
-// Nunca PWM en RPWM y LPWM a la vez -- shoot-through / freno no intencional.
+// Nunca PWM en RPWM y LPWM a la vez.
 void aplicarMotor(uint8_t m, int8_t dir, uint8_t d) {
   d = constrain(d, 0, MAX_DUTY_ABSOLUTO);
   uint8_t en = (m == 1) ? M1_EN : M2_EN;
@@ -260,35 +169,69 @@ float leerNumero(const char* prompt) {
   }
 }
 
+// --- Pulso con corte por 'x' y reporte de encoders -------------------------
+const char* sentidoFisico(uint8_t m, int32_t delta) {
+  if (delta == 0) return "sin giro";
+  bool adelante = (m == 1) ? (delta < 0) : (delta > 0);   // convencion §7.30
+  return adelante ? "ADELANTE del robot" : "ATRAS del robot";
+}
+
+void informarMotor(uint8_t m, int32_t delta, int32_t deltaVentana, uint32_t msVentana,
+                   bool comandado) {
+  Serial.printf("  M%u: delta = %+ld pulsos (%.2f vueltas)", m, (long)delta, delta / PPR);
+  if (msVentana > 0) {
+    float rpm = (deltaVentana / PPR) / (msVentana / 60000.0f);
+    Serial.printf(", %.0f RPM (ultimos %lu ms)", fabsf(rpm), (unsigned long)msVentana);
+  }
+  Serial.printf(" -> %s", sentidoFisico(m, delta));
+  if (!comandado && abs(delta) > 3) Serial.print(F("  [!] se movio sin comando: revisar acople"));
+  Serial.println();
+}
+
+// m = 1 o 2: un motor; m = 0: los dos.
 void pulso(uint8_t m) {
   uint8_t d = constrain(duty, 0, MAX_DUTY_ABSOLUTO);
-  Serial.print(F("\n--- Pulso: motor ")); Serial.print(m);
-  Serial.print(F(", ")); Serial.print(sentido > 0 ? F("FWD") : F("REV"));
-  Serial.print(F(", duty ")); Serial.print(d);
-  Serial.print(F(" (")); Serial.print(100.0f * d / 255.0f, 1);
-  Serial.println(F("%), 2 s"));
-  Serial.println(F("Mirar/escuchar: sentido correcto, sin ruidos raros."));
+  Serial.print(F("\n--- Pulso: "));
+  if (m == 0) Serial.print(F("AMBOS motores"));
+  else { Serial.print(F("motor ")); Serial.print(m); }
+  Serial.print(F(", ")); Serial.print(sentido > 0 ? F("FWD (RPWM)") : F("REV (LPWM)"));
+  Serial.printf(", duty %u (%.1f%%), %lu ms  -- 'x' corta\n",
+                d, 100.0f * d / 255.0f, (unsigned long)PULSO_MS);
 
-  aplicarMotor(m, sentido, d);
-  delay(PULSO_MS);
-  pararMotor(m);
-  Serial.println(F("listo, motor detenido."));
-}
+  int32_t e1Ini, e2Ini, e1Ven = 0, e2Ven = 0;
+  vaciarEntrada();
+  leerEncoders(e1Ini, e2Ini);
 
-void pulsoAmbos() {
-  uint8_t d = constrain(duty, 0, MAX_DUTY_ABSOLUTO);
-  Serial.print(F("\n--- Pulso AMBOS motores, duty ")); Serial.print(d);
-  Serial.println(F(", 2 s ---"));
-  Serial.println(F("Chequeo cualitativo: algun motor suena/vibra distinto"));
-  Serial.println(F("que corriendo solo? (comparar con pulso individual)"));
+  if (m == 1 || m == 0) aplicarMotor(1, sentido, d);
+  if (m == 2 || m == 0) aplicarMotor(2, sentido, d);
 
-  aplicarMotor(1, sentido, d);
-  aplicarMotor(2, sentido, d);
-  delay(PULSO_MS);
+  uint32_t t0 = millis(), tVen = 0;
+  bool ventanaTomada = false, cortado = false;
+  while (millis() - t0 < PULSO_MS) {
+    if (!ventanaTomada && millis() - t0 >= PULSO_MS - VENTANA_MS) {
+      leerEncoders(e1Ven, e2Ven);
+      tVen = millis();
+      ventanaTomada = true;
+    }
+    if (Serial.available() && Serial.read() == 'x') { cortado = true; break; }
+    delay(1);
+  }
+
+  int32_t e1Fin, e2Fin;
+  leerEncoders(e1Fin, e2Fin);
+  uint32_t msVen = ventanaTomada ? millis() - tVen : 0;
   pararTodo();
-  Serial.println(F("listo, motores detenidos."));
+
+  if (cortado) Serial.printf("[x] CORTADO a los %lu ms. Motores detenidos.\n",
+                             (unsigned long)(millis() - t0));
+  else         Serial.println(F("Listo, motores detenidos."));
+
+  informarMotor(1, e1Fin - e1Ini, e1Fin - e1Ven, msVen, m == 1 || m == 0);
+  informarMotor(2, e2Fin - e2Ini, e2Fin - e2Ven, msVen, m == 2 || m == 0);
+  Serial.println(F("  Tocar el driver y el motor: tienen que estar frios o apenas tibios."));
 }
 
+// --- Interfaz -----------------------------------------------------------------
 void menu() {
   Serial.println(F("\n=== TEST 11 - bring-up BTS7960 ==="));
   Serial.print(F("motor = ")); Serial.print(motor);
@@ -298,26 +241,44 @@ void menu() {
   Serial.println(F("1/2=motor  i=invertir  d=duty  p=pulso 2s  a=pulso AMBOS  x=parar"));
 }
 
+void imprimirResetReason() {
+  esp_reset_reason_t r = esp_reset_reason();
+  Serial.printf("\n[RESET] esp_reset_reason() = %d", (int)r);
+  switch (r) {
+    case ESP_RST_POWERON:  Serial.println(F("  (POWERON -- arranque normal)")); break;
+    case ESP_RST_SW:       Serial.println(F("  (SW -- reset por software)"));    break;
+    case ESP_RST_PANIC:    Serial.println(F("  (PANIC -- excepcion en firmware)")); break;
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:      Serial.println(F("  (WATCHDOG)"));                   break;
+    case ESP_RST_BROWNOUT: Serial.println(F("  (BROWNOUT <<< EL RIEL SE HUNDE)")); break;
+    case ESP_RST_EXT:      Serial.println(F("  (EXT -- reset por pin EN)"));    break;
+    default:               Serial.println(F("  (otro)"));                       break;
+  }
+  if (r == ESP_RST_BROWNOUT) {
+    Serial.println(F("[!] BROWNOUT: la alimentacion no sostuvo al ESP32 -- probablemente"));
+    Serial.println(F("[!] durante un pulso. NO seguir subiendo duty: revisar Buck y C4/C5."));
+  }
+}
+
 void setup() {
+  configurarPines();                 // estado seguro antes que nada
   Serial.begin(115200);
   delay(1000);
-  configurarPines();
 
   Serial.println(F("\n\n########################################"));
-  Serial.println(F("TEST 11 - bring-up del BTS7960"));
+  Serial.println(F("TEST 11 - bring-up del BTS7960 (Etapa 3)"));
   Serial.println(F("########################################"));
-  Serial.println(F("SOLO verificacion de cableado y sentido. No mide torque."));
-  Serial.println(F("\n⚠️ PINES: asuncion (reuso de los del L298N). Verificar"));
-  Serial.println(F("   contra el cableado real antes de confiar en el sentido."));
-  Serial.println(F("⚠️ SIN pull-downs de seguridad en estos pines todavia."));
-  Serial.println(F("   Mano en el switch de V+."));
-  Serial.println(F("⚠️ Tope de duty conservador (130), NO el 160 del L298N --"));
-  Serial.println(F("   este driver cae mucho menos, el mismo duty da mas tension."));
+  Serial.println(F("Verificacion de sentido y encoders. No mide torque."));
+  Serial.println(F("RUEDAS EN EL AIRE. Mano en el switch de V+."));
+  Serial.println(F("Tope de duty 121 (no el 160 del L298N)."));
+  Serial.println(F("Convencion (§7.30): ADELANTE del robot = M1 negativo, M2 positivo."));
+  imprimirResetReason();
   Serial.println(F("\nOrden sugerido:"));
-  Serial.println(F("  1. Motor 1 solo, duty bajo (60), FWD -> confirmar sentido"));
-  Serial.println(F("  2. Motor 1 solo, REV ('i') -> confirmar que invierte bien"));
+  Serial.println(F("  1. Motor 1, duty 40, FWD -> sentido y signo del encoder"));
+  Serial.println(F("  2. Motor 1, REV ('i') -> que invierta"));
   Serial.println(F("  3. Repetir con motor 2"));
-  Serial.println(F("  4. Subir duty de a poco si todo se ve normal"));
+  Serial.println(F("  4. Si no gira, subir duty de a 10 ('d')"));
   Serial.println(F("  5. 'a' -> los dos juntos, chequeo auditivo cualitativo"));
   menu();
 }
@@ -333,7 +294,7 @@ void loop() {
                 if (!isnan(v) && v > 0) duty = constrain((int)v, 1, MAX_DUTY_ABSOLUTO);
                 menu(); break; }
     case 'p': pulso(motor); menu(); break;
-    case 'a': pulsoAmbos(); menu(); break;
+    case 'a': pulso(0); menu(); break;
     case 'x': pararTodo(); Serial.println(F("\nPARADO.")); menu(); break;
     default: break;
   }
