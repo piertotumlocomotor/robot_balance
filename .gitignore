@@ -52,3 +52,4 @@ docs/bts7960_datasheet.pdf
 # Cache de imagenes de ecuaciones (mathtext), regenerada sola en cada build
 # de generar_pdf.py -- no aporta nada versionada, solo ruido de binarios.
 informes/eq/
+aprendizaje_refuerzo/informe/eq/

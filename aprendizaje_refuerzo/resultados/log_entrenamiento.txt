@@ -1,0 +1,39 @@
+30 corridas en 7 procesos...
+  DQN         semilla  4: retorno  495.4, sobrevive 100.0%
+  DQN         semilla  3: retorno  486.2, sobrevive 100.0%
+  DQN         semilla  1: retorno  496.4, sobrevive 100.0%
+  DQN         semilla  5: retorno  495.1, sobrevive 100.0%
+  DQN         semilla  2: retorno  485.3, sobrevive 100.0%
+  DQN         semilla  0: retorno  494.7, sobrevive 100.0%
+  DQN         semilla  6: retorno  496.6, sobrevive 100.0%
+  DQN         semilla  8: retorno  493.3, sobrevive 100.0%
+  DQN         semilla  7: retorno  493.4, sobrevive 100.0%
+  DQN         semilla  9: retorno  496.0, sobrevive 100.0%
+  Double DQN  semilla  0: retorno  486.2, sobrevive 100.0%
+  Double DQN  semilla  1: retorno  479.7, sobrevive 100.0%
+  Double DQN  semilla  2: retorno  484.6, sobrevive 100.0%
+  Double DQN  semilla  3: retorno  491.1, sobrevive 100.0%
+  A2C         semilla  0: retorno  475.8, sobrevive 100.0%
+  A2C         semilla  1: retorno  494.3, sobrevive 100.0%
+  A2C         semilla  2: retorno  475.7, sobrevive 100.0%
+  A2C         semilla  3: retorno  478.7, sobrevive 100.0%
+  A2C         semilla  4: retorno  475.9, sobrevive 100.0%
+  A2C         semilla  5: retorno  478.9, sobrevive  99.5%
+  Double DQN  semilla  4: retorno  496.6, sobrevive 100.0%
+  Double DQN  semilla  5: retorno  496.7, sobrevive 100.0%
+  Double DQN  semilla  6: retorno  493.4, sobrevive 100.0%
+  Double DQN  semilla  7: retorno  493.9, sobrevive 100.0%
+  Double DQN  semilla  8: retorno  472.7, sobrevive 100.0%
+  Double DQN  semilla  9: retorno  481.0, sobrevive 100.0%
+  A2C         semilla  6: retorno  475.9, sobrevive  99.5%
+  A2C         semilla  7: retorno  478.9, sobrevive 100.0%
+  A2C         semilla  8: retorno  472.6, sobrevive 100.0%
+  A2C         semilla  9: retorno  476.7, sobrevive 100.0%
+
+Evaluación sin exploración (200 episodios nuevos por semilla), media ± desvío entre 10 semillas:
+  DQN         retorno    493.3 ± 3.9 | sobrevive  100.0 ± 0.0% | |θ|  0.59 ± 0.24° | |Δduty|  19.6 ± 20.9 | pasos hasta 450: 72724 ± 6478
+  Double DQN  retorno    487.6 ± 7.7 | sobrevive  100.0 ± 0.0% | |θ|  0.80 ± 0.32° | |Δduty|  40.8 ± 27.5 | pasos hasta 450: 80797 ± 6028
+  A2C         retorno    478.3 ± 5.6 | sobrevive   99.9 ± 0.2% | |θ|  0.31 ± 0.16° | |Δduty|   23.0 ± 5.0 | pasos hasta 450: 166383 ± 28114
+  PD a mano   retorno    494.4 ± 0.0 | sobrevive  100.0 ± 0.0% | |θ|  0.66 ± 0.00° | |Δduty|   32.4 ± 0.0 | pasos hasta 450: —
+
+Figuras en /Users/cesaryepez/Documents/robot_balance/aprendizaje_refuerzo/figuras

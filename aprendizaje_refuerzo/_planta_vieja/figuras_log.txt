@@ -1,0 +1,85 @@
+/Users/cesaryepez/Documents/robot_balance/aprendizaje_refuerzo/dqn_pendulo.py:276: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()
+/Users/cesaryepez/Documents/robot_balance/aprendizaje_refuerzo/dqn_pendulo.py:302: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()
+Dispositivo: cpu
+Observación: 3 | Acciones: 9 | Duty de cada acción: [-160 -140 -120 -100    0  100  120  140  160]
+
+Entrenando DQN, semilla 0...
+  Paso    2011 | ε=0.961 | Episodio   50 | Media (últ. 50):   30.6
+  Paso    4107 | ε=0.920 | Episodio  100 | Media (últ. 50):   32.1
+  Paso    6138 | ε=0.880 | Episodio  150 | Media (últ. 50):   30.9
+  Paso    8097 | ε=0.841 | Episodio  200 | Media (últ. 50):   29.4
+  Paso   10251 | ε=0.799 | Episodio  250 | Media (últ. 50):   33.0
+  Paso   12382 | ε=0.757 | Episodio  300 | Media (últ. 50):   32.0
+  Paso   14880 | ε=0.708 | Episodio  350 | Media (últ. 50):   38.8
+  Paso   17636 | ε=0.654 | Episodio  400 | Media (últ. 50):   43.6
+  Paso   21078 | ε=0.587 | Episodio  450 | Media (últ. 50):   56.1
+  Paso   28619 | ε=0.439 | Episodio  500 | Media (últ. 50):  134.9
+  Paso   49171 | ε=0.036 | Episodio  550 | Media (últ. 50):  396.2
+  Paso   73740 | ε=0.020 | Episodio  600 | Media (últ. 50):  451.9
+  Paso   98740 | ε=0.020 | Episodio  650 | Media (últ. 50):  487.5
+  Paso  123740 | ε=0.020 | Episodio  700 | Media (últ. 50):  484.8
+  Paso  148271 | ε=0.020 | Episodio  750 | Media (últ. 50):  477.5
+  Tiempo de entrenamiento: 3773.2 min
+
+Entrenando DQN, semilla 1...
+  Paso    2025 | ε=0.960 | Episodio   50 | Media (últ. 50):   30.6
+  Paso    4172 | ε=0.918 | Episodio  100 | Media (últ. 50):   33.1
+  Paso    6001 | ε=0.882 | Episodio  150 | Media (últ. 50):   27.1
+  Paso    7845 | ε=0.846 | Episodio  200 | Media (últ. 50):   27.2
+  Paso    9862 | ε=0.807 | Episodio  250 | Media (últ. 50):   30.5
+  Paso   11829 | ε=0.768 | Episodio  300 | Media (últ. 50):   29.1
+  Paso   14253 | ε=0.721 | Episodio  350 | Media (últ. 50):   37.5
+  Paso   16746 | ε=0.672 | Episodio  400 | Media (últ. 50):   38.6
+  Paso   19829 | ε=0.611 | Episodio  450 | Media (últ. 50):   49.3
+  Paso   23335 | ε=0.543 | Episodio  500 | Media (últ. 50):   57.1
+  Paso   37894 | ε=0.257 | Episodio  550 | Media (últ. 50):  273.5
+  Paso   61984 | ε=0.020 | Episodio  600 | Media (últ. 50):  452.5
+  Paso   86984 | ε=0.020 | Episodio  650 | Media (últ. 50):  474.4
+  Paso  111563 | ε=0.020 | Episodio  700 | Media (últ. 50):  480.2
+  Paso  136133 | ε=0.020 | Episodio  750 | Media (últ. 50):  477.2
+  Tiempo de entrenamiento: 7.0 min
+
+Entrenando Double DQN, semilla 0...
+  Paso    2011 | ε=0.961 | Episodio   50 | Media (últ. 50):   30.6
+  Paso    3923 | ε=0.923 | Episodio  100 | Media (últ. 50):   28.5
+  Paso    6092 | ε=0.881 | Episodio  150 | Media (últ. 50):   33.6
+  Paso    8031 | ε=0.843 | Episodio  200 | Media (últ. 50):   29.0
+  Paso    9973 | ε=0.805 | Episodio  250 | Media (últ. 50):   28.9
+  Paso   11995 | ε=0.765 | Episodio  300 | Media (últ. 50):   30.2
+  Paso   14334 | ε=0.719 | Episodio  350 | Media (últ. 50):   35.9
+  Paso   16846 | ε=0.670 | Episodio  400 | Media (últ. 50):   39.0
+  Paso   20627 | ε=0.596 | Episodio  450 | Media (últ. 50):   62.8
+  Paso   24185 | ε=0.526 | Episodio  500 | Media (últ. 50):   57.9
+  Paso   29845 | ε=0.415 | Episodio  550 | Media (últ. 50):   97.9
+  Paso   45779 | ε=0.103 | Episodio  600 | Media (últ. 50):  298.5
+  Paso   69000 | ε=0.020 | Episodio  650 | Media (últ. 50):  426.3
+  Paso   94000 | ε=0.020 | Episodio  700 | Media (últ. 50):  480.1
+  Paso  118544 | ε=0.020 | Episodio  750 | Media (últ. 50):  478.6
+  Paso  143544 | ε=0.020 | Episodio  800 | Media (últ. 50):  487.0
+  Tiempo de entrenamiento: 12.2 min
+
+Entrenando Double DQN, semilla 1...
+  Paso    2025 | ε=0.960 | Episodio   50 | Media (últ. 50):   30.6
+  Paso    4009 | ε=0.921 | Episodio  100 | Media (últ. 50):   29.8
+  Paso    5748 | ε=0.887 | Episodio  150 | Media (últ. 50):   25.4
+  Paso    7542 | ε=0.852 | Episodio  200 | Media (últ. 50):   26.2
+  Paso    9525 | ε=0.813 | Episodio  250 | Media (últ. 50):   29.5
+  Paso   11505 | ε=0.775 | Episodio  300 | Media (últ. 50):   29.1
+  Paso   13823 | ε=0.729 | Episodio  350 | Media (últ. 50):   35.7
+  Paso   16336 | ε=0.680 | Episodio  400 | Media (últ. 50):   38.9
+  Paso   19919 | ε=0.610 | Episodio  450 | Media (últ. 50):   58.9
+  Paso   23334 | ε=0.543 | Episodio  500 | Media (últ. 50):   55.2
+  Paso   33099 | ε=0.351 | Episodio  550 | Media (últ. 50):  178.5
+  Paso   53347 | ε=0.020 | Episodio  600 | Media (últ. 50):  375.8
+  Paso   78347 | ε=0.020 | Episodio  650 | Media (últ. 50):  467.4
+  Paso  103347 | ε=0.020 | Episodio  700 | Media (últ. 50):  488.1
+  Paso  127978 | ε=0.020 | Episodio  750 | Media (últ. 50):  463.0
+  Tiempo de entrenamiento: 4.2 min
+
+Evaluación greedy, 200 episodios con semillas no vistas:
+  DQN         s0 | retorno  488.2 ±   3.1 | sobrevive 100.0% | |θ| medio 0.925° | |Δduty| medio  21.2
+  DQN         s1 | retorno  492.7 ±   1.7 | sobrevive 100.0% | |θ| medio 0.538° | |Δduty| medio  39.0
+  Double DQN  s0 | retorno  474.8 ±   0.9 | sobrevive 100.0% | |θ| medio 0.446° | |Δduty| medio  56.5
+  Double DQN  s1 | retorno  483.0 ±  11.9 | sobrevive 100.0% | |θ| medio 0.457° | |Δduty| medio  23.0

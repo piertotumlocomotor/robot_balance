@@ -1,0 +1,16 @@
+{
+ "ejemplo_transiciones": "Con el robot inclinado 3° hacia adelante, la red elige empujar en sentido contrario (duty negativo), casi siempre a fondo: en 50 ms la inclinación empieza a bajar y dθ/dt se vuelve negativo, es decir, el robot ya viaja hacia la vertical. Q(s, a) estima el retorno descontado desde ese estado si se toma a y después se juega bien. La diferencia con no hacer nada (duty 0) es chica (0.1 a 0.2), porque no actuar durante un solo paso de 10 ms se puede corregir en el siguiente. Para decidir importa qué acción tiene el mayor Q, no el valor exacto.",
+ "discusion": [
+  "**Los tres agentes aprenden a balancear el robot** en las 10 semillas. DQN y Double DQN sobreviven el 100 % de los episodios de evaluación; A2C, el 99.9 % (una caída en 2 000 episodios).",
+  "**DQN es el más eficiente en datos**: llega a un retorno de 450 en ≈ 73 000 pasos, Double DQN en ≈ 81 000 y A2C en ≈ 166 000, con una dispersión entre semillas bastante mayor (Figura 5). DQN y Double DQN reutilizan cada transición muchas veces desde el *replay buffer*; A2C (*on-policy*) usa cada dato una sola vez.",
+  "**Double DQN no mejora a DQN en este problema**: es algo más lento y obtiene un retorno un poco menor y más disperso (487.6 ± 7.7 contra 493.3 ± 3.9). Con 9 acciones y recompensas acotadas en [0, 1] la sobreestimación del máximo es chica, así que hay poco que corregir; una explicación posible de la leve demora es que su objetivo, más conservador, propaga el valor más despacio.",
+  "**A2C deja al robot más derecho** (|θ| medio 0.31° contra 0.59° de DQN) pero lo hace con pulsos de motor a fondo (Figura 6), que la recompensa castiga; por eso su retorno es algo menor. Su curva de entrenamiento queda por debajo porque mientras entrena la política es aleatoria.",
+  "**El PD ajustado a mano rinde igual que el mejor agente** (494.4 contra 493.3). El modelo es casi lineal y el problema es chico; el aporte del aprendizaje por refuerzo es llegar al mismo desempeño **sin conocer la ecuación**, solo con la recompensa.",
+  "En todos los casos queda una **oscilación residual** de unas décimas de grado cerca de la vertical (Figura 6), por la falta de niveles de motor finos (sección 6)."
+ ],
+ "conclusiones": [
+  "Se construyó un simulador del robot balanceador a partir de mediciones reales, se formuló el balanceo como MDP y se entrenaron DQN, Double DQN y A2C con 10 semillas cada uno: los tres resuelven el problema.",
+  "DQN fue el mejor compromiso: mayor retorno, menor variabilidad entre semillas y menos de la mitad de experiencia que A2C. Double DQN no aportó mejoras en un problema con pocas acciones y recompensas acotadas.",
+  "El resultado depende de un parámetro supuesto (K_U). Antes de llevar la política al robot hay que medirlo, agregar al modelo el ruido del sensor, la demora del lazo y la dinámica de las ruedas, y probar acciones más finas o continuas para eliminar la oscilación residual."
+ ]
+}
