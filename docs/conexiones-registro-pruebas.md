@@ -2716,6 +2716,86 @@ y `CMD` en la f.29.
   del IDE. **El Serial Monitor del IDE retiene el puerto y se reabre solo** al reabrir el IDE: con
   el panel abierto, `arduino-cli upload`/`monitor` fallan con "port busy".
 
+### 7.31 Etapa 3 — primer movimiento: M2 anda, M1 no; corto con la punta y ESP32 quemado — ⛔ ABIERTO (2026-10-12)
+
+Batería recién cargada. Test 11 (con el comando `t` nuevo, pulso de 1–6 s) flasheado; motores
+conectados, ruedas en el aire.
+
+#### Checklist previo — pasó
+
+| Punto | Resultado |
+|---|---|
+| Arranque con motores conectados | `POWERON`, motores quietos y en silencio (pull-downs OK con carga real) |
+| `B+` IBT-2 #1 / #2 (reposo) | 12.4V / 12.4V |
+| `VCC` IBT-2 #1 / #2 | 4.99V / 4.99V |
+
+#### Resultados de los pulsos
+
+| Duty | M1 (IBT-2 #1) | M2 (IBT-2 #2) |
+|---|---|---|
+| 40 / 50 | Δ 0, no gira | — |
+| 80 (3.89V ideal) | Δ 0 a −2, no gira (6 pulsos de 6 s) | **413 RPM** (modo `a`) |
+| 110 (5.35V ideal) | Δ 0, no gira | **580 RPM** (modo `a`) |
+
+| Tensión medida (DC, pulso de 6 s) | Duty 50 | Duty 80 |
+|---|---|---|
+| M1, pestañas del motor | 0.56V | 1.0V |
+| M1, bornera `M+`/`M−` del IBT-2 #1 | — | **1.0V** |
+| M2, pestañas del motor | — | **4.0V** (≈ los 3.89V ideales) |
+
+- **El IBT-2 #2 entrega el duty completo a 20 kHz** y M2 responde coherente con 793 RPM @ 6V
+  (413/580 RPM ≈ 80% de la proporción ideal, fricción de reductora). **Queda descartada la
+  frecuencia del PWM** como causa. Sentido: M2 con `FWD` (`RPWM`) gira **ATRÁS del robot**; M1 con
+  `FWD` da tirones de −1/−2 pulsos = **ADELANTE**. Para el control habrá que invertir uno.
+- **M1: la salida del IBT-2 #1 ya sale en ~1/4 del valor ideal** (0.23 a duty 50, 0.26 a duty 80
+  — factor multiplicativo, no una pérdida fija por ciclo). No es el cable al motor (la bornera da
+  lo mismo que las pestañas). Candidatos sin discriminar: (a) resistencia en la alimentación del
+  #1 que solo aparece bajo carga — `B+` dio 12.28V en el nodo estrella y en `B+`/`B−` del #1, pero
+  **no está claro si fue durante un pulso**; (b) motor M1 con bobinado en corto que pone al driver
+  en limitación de corriente; (c) IBT-2 #1 dañado. Pendiente: `B+` del #1 **durante** un pulso,
+  `R_m` de M1 vs M2 con óhmetro, y cruzar motores entre drivers.
+- ⛔ **Hipótesis descartada en la sesión** (lección 8): "pérdida fija por ciclo por los tiempos
+  de conmutación del BTS7960 a 20 kHz" (datasheet §4.2.3: retardos de 1.2–5.8 µs con `R_SR` = 0,
+  hasta 25 µs con 51 kΩ). Predecía ~2.0V a duty 80; dio 1.0V, y M2 recibe el duty completo.
+
+#### ⛔ Incidente: corto de la batería con la punta del multímetro → ESP32 quemado
+
+Midiendo `B+` del IBT-2 #1, **la punta tocó `B+` y `B−` a la vez**: chispazo leve = **corto
+directo de la batería** (LiPo 35C, muy por encima de los 10A del fusible). Después, **con batería
+sola (sin USB), el ESP32 (MAC `20:9b:a9:67:89:c0`) se puso muy caliente**. El usuario desconectó
+todo.
+
+- **El LED azul de la placa se encendió** en ese momento — nunca antes se había visto encendido
+  (el rojo es el de alimentación). En las NodeMCU-32S el azul suele estar en GPIO2 (**no
+  confirmado en esta placa**) y ningún sketch del proyecto lo maneja: coherente con un chip dañado
+  con sus pines en estado anormal. Observación, no prueba.
+
+- Mecanismo probable, **sin confirmar**: el corto hunde el bus y al abrirse la inductancia del
+  cableado genera un pico; si dañó al Buck y dejó de regular, el riel de 5V (`VIN`) pudo subir
+  hacia 12V. Alternativas: falla interna del IBT-2 #1 (`B+`→`VCC`, que está sobre el riel de 5V),
+  o que la punta haya tocado algo lógico.
+- **Primera medición pasiva (sin batería, sin USB)**: fila 12 (3V3) ↔ riel "−" **da continuidad**
+  (beep) — contra **135kΩ** de referencia (§7.25). **El riel de 3V3 está en corto o casi.**
+  ⏳ Falta el valor en Ω (modo Ω, con offset).
+
+#### ⏳ Para retomar — en este orden, TODO sin batería hasta el paso 5
+
+1. Riel 3V3 en **Ω** (fila 12 ↔ riel "−", restando offset).
+2. **Sacar el ESP32** del protoboard y repetir: si el corto desaparece, era el ESP32; si sigue,
+   está en el GY-521 o en los encoders (separarlos de a uno).
+3. Riel de 5V ↔ riel "−" en Ω — referencia **~360Ω** (camino pasivo del Buck, CLAUDE.md).
+4. **Fusible de 10A**: continuidad/resistencia (lección 12 — un corto puede degradarlo sin abrirlo).
+5. **Buck aislado** (su `OUT` desconectado del riel), con batería: tiene que dar **5.01V**. Si da
+   ~12V, el Buck es la causa y está **inutilizado**.
+6. Revisar el IBT-2 #1 (resistencia `B+`↔`VCC` y `B+`↔`B−`) — tiene además la salida débil.
+7. ⛔ **No poner otra placa ESP32 hasta cerrar 1–6.** Con una falla sin explicar, la placa nueva
+   muere igual (ya pasó en §7.29).
+
+⚠️ **Lección nueva (15)**: medir `B+`/`B−` con las puntas en dos bornes **separados** (por
+ejemplo `B+` del driver contra el nodo estrella o contra el `B−` de otro punto), nunca entre dos
+tornillos contiguos de la misma bornera donde una punta puede puentearlos. Con una LiPo 35C, un
+puente de 1 s es un corto de cientos de amperes.
+
 ---
 
 ## 8. Próximo paso

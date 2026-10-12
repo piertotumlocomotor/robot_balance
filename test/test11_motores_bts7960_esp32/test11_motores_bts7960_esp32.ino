@@ -57,8 +57,9 @@
   ------------------------------------------------------------------------
   QUE HACE ESTE SKETCH
 
-  Pulso CORTO (2 s) al motor elegido, a duty bajo, y se detiene solo. 'x'
-  durante el pulso lo corta en el acto. Al terminar informa, de los dos
+  Pulso CORTO (2 s por defecto; 't' lo lleva hasta 6 s para que un
+  multimetro llegue a asentarse) al motor elegido, a duty bajo, y se detiene
+  solo. 'x' durante el pulso lo corta en el acto. Al terminar informa, de los dos
   encoders, el delta de pulsos y las RPM del ultimo medio segundo, y traduce
   el signo a sentido fisico con la convencion medida en §7.30:
 
@@ -88,7 +89,9 @@ const uint8_t  PWM_RES_BITS = 8;
 const uint8_t MAX_DUTY_ABSOLUTO = 121;
 uint8_t duty = 40;     // arranque bien bajo; subir de a poco
 
-const uint32_t PULSO_MS   = 2000;
+const uint32_t PULSO_MIN_MS = 1000;
+const uint32_t PULSO_MAX_MS = 6000; // tope: motor trabado a duty bajo, sin riesgo termico
+uint32_t pulsoMs = 2000;
 const uint32_t VENTANA_MS = 500;    // RPM sobre el final del pulso, ya sin el arranque
 const float    PPR        = 69.1f;  // pulsos/vuelta, decodificacion 1x (§7.11, §7.30)
 
@@ -196,7 +199,7 @@ void pulso(uint8_t m) {
   else { Serial.print(F("motor ")); Serial.print(m); }
   Serial.print(F(", ")); Serial.print(sentido > 0 ? F("FWD (RPWM)") : F("REV (LPWM)"));
   Serial.printf(", duty %u (%.1f%%), %lu ms  -- 'x' corta\n",
-                d, 100.0f * d / 255.0f, (unsigned long)PULSO_MS);
+                d, 100.0f * d / 255.0f, (unsigned long)pulsoMs);
 
   int32_t e1Ini, e2Ini, e1Ven = 0, e2Ven = 0;
   vaciarEntrada();
@@ -207,8 +210,8 @@ void pulso(uint8_t m) {
 
   uint32_t t0 = millis(), tVen = 0;
   bool ventanaTomada = false, cortado = false;
-  while (millis() - t0 < PULSO_MS) {
-    if (!ventanaTomada && millis() - t0 >= PULSO_MS - VENTANA_MS) {
+  while (millis() - t0 < pulsoMs) {
+    if (!ventanaTomada && millis() - t0 >= pulsoMs - VENTANA_MS) {
       leerEncoders(e1Ven, e2Ven);
       tVen = millis();
       ventanaTomada = true;
@@ -237,8 +240,9 @@ void menu() {
   Serial.print(F("motor = ")); Serial.print(motor);
   Serial.print(F("   sentido = ")); Serial.print(sentido > 0 ? F("FWD") : F("REV"));
   Serial.print(F("   duty = ")); Serial.print(duty);
-  Serial.print(F(" (tope absoluto ")); Serial.print(MAX_DUTY_ABSOLUTO); Serial.println(F(")"));
-  Serial.println(F("1/2=motor  i=invertir  d=duty  p=pulso 2s  a=pulso AMBOS  x=parar"));
+  Serial.print(F(" (tope absoluto ")); Serial.print(MAX_DUTY_ABSOLUTO); Serial.print(F(")"));
+  Serial.printf("   pulso = %.1f s\n", pulsoMs / 1000.0f);
+  Serial.println(F("1/2=motor  i=invertir  d=duty  t=duracion  p=pulso  a=pulso AMBOS  x=parar"));
 }
 
 void imprimirResetReason() {
@@ -292,6 +296,10 @@ void loop() {
     case 'i': sentido = -sentido; menu(); break;
     case 'd': { float v = leerNumero("Duty: ");
                 if (!isnan(v) && v > 0) duty = constrain((int)v, 1, MAX_DUTY_ABSOLUTO);
+                menu(); break; }
+    case 't': { float v = leerNumero("Duracion del pulso en s (1-6): ");
+                if (!isnan(v) && v > 0)
+                  pulsoMs = constrain((uint32_t)(v * 1000.0f), PULSO_MIN_MS, PULSO_MAX_MS);
                 menu(); break; }
     case 'p': pulso(motor); menu(); break;
     case 'a': pulso(0); menu(); break;

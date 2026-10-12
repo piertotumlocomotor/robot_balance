@@ -43,12 +43,12 @@ se midió con el L298N. Sube cuando se mida `K_U` con los BTS7960.
 
 Calibración del MPU6050 (bias, escala, ejes) · PPR de encoders 69.1 y mapeo de colores ·
 motor JGB37-520B 6V/793RPM · asimetría M1/M2 (M2 ≈ 81% del torque de M1) · restricciones
-de GPIO del ESP32 · datos de datasheet del BTS7960 · **las 14 lecciones de método**.
+de GPIO del ESP32 · datos de datasheet del BTS7960 · **las 15 lecciones de método**.
 
 ### Dónde vive cada cosa
 
 - **POST / vigente**: este archivo, `docs/conexiones-registro-pruebas.md` (§1–§6, §8, y
-  §7.22–§7.30), y los planos de `docs/` — potencia, señales, conexiones, plan de
+  §7.22–§7.31), y los planos de `docs/` — potencia, señales, conexiones, plan de
   cableado, distribución de niveles, plantillas, ensayo de `m·l`.
 - **PRE / deprecado**: **[`docs/obsoleto/`](docs/obsoleto/README.md)** (con su propio
   README explicando la frontera), más las secciones de este archivo marcadas ⛔ y
@@ -142,7 +142,7 @@ Python. ⚠️ **La ubicación cambió el 2026-08-19/20** — ya no vive todo ba
 
 Chip USB-serie **CP2102** (puede requerir driver CP210x en macOS). Conector USB-C.
 
-⚠️ **Placa reemplazada el 2026-09-21**: la original (MAC `68:09:47:9b:f7:e0`) quedó sin respuesta; la vigente es la MAC `20:9b:a9:67:89:c0`, mismo pinout. **GND del ESP32 al riel lógico: pin izq. 5 (fila 25)**, entre GPIO12 y GPIO13. ⛔ El pin junto a `5V` que la serigrafía marca GND **no es masa** (registro §7.29). **Para flashear, el switch de la batería tiene que estar en ON**: con solo el USB, la placa alimenta el Buck al revés y la flash no responde.
+⚠️ **Placa reemplazada el 2026-09-21**: la original (MAC `68:09:47:9b:f7:e0`) quedó sin respuesta; la vigente es la MAC `20:9b:a9:67:89:c0`, mismo pinout. ⛔ **Esa segunda placa se recalentó el 2026-10-12** tras un corto de la batería con la punta del multímetro — casi seguro muerta, causa del daño sin confirmar (registro §7.31). No montar una tercera hasta cerrar el diagnóstico. **GND del ESP32 al riel lógico: pin izq. 5 (fila 25)**, entre GPIO12 y GPIO13. ⛔ El pin junto a `5V` que la serigrafía marca GND **no es masa** (registro §7.29). **Para flashear, el switch de la batería tiene que estar en ON**: con solo el USB, la placa alimenta el Buck al revés y la flash no responde.
 
 **Pines asignados** (ver `docs/conexiones-registro-pruebas.md` sección 3):
 
@@ -1052,6 +1052,14 @@ reglas van juntas acá:
    pin no sea masa: **continuidad hacia un pin no prueba qué es ese pin.** Síntoma a reconocer:
    **varias tensiones "un poco corridas" a la vez apuntan a la referencia**, no a varios
    componentes fallando juntos.
+15. **Nunca medir entre dos bornes contiguos de potencia donde una punta pueda puentearlos.** El
+   2026-10-12, midiendo `B+` del IBT-2 #1, la punta tocó `B+` y `B−` de la misma bornera a la vez:
+   corto directo de una LiPo 35C (cientos de amperes por un instante, muy por encima del fusible de
+   10A). Después el ESP32 se recalentó con batería sola (registro §7.31). Medir `B+` contra un `B−`
+   en otro punto (nodo estrella, otro borne), con puntas de punta fina o capuchón, y **siempre con
+   una mano** — nunca mover la punta sobre una bornera energizada. Después de cualquier chispazo,
+   tratar el sistema como sospechoso: pasivos en Ω primero, el fusible (lección 12) y el Buck
+   aislado antes de volver a energizar nada.
 
 ## Medición de τ(u) con balanza — método (Test 7, 2026-08-16)
 
@@ -1532,7 +1540,7 @@ compila tal cual para ESP32. Estado real:
 | 8 — Caída del L298N (multímetro) | [`test8_caida_l298n_esp32/`](test/test8_caida_l298n_esp32/test8_caida_l298n_esp32.ino) + [`test8b_caida_barrido_esp32/`](test/test8b_caida_barrido_esp32/test8b_caida_barrido_esp32.ino) | ⛔ **Corridos 2026-08-17, la vía no sirvió.** Ver `docs/conexiones-registro-pruebas.md` 7.18. Los dos modelos son falsos: el Test 8 asume 0 V en el tramo OFF del PWM, el 8b asume `V_off` constante (R² 0.77–0.83 en 4 barridos, ajuste mal condicionado). Y la lectura **arranca alta y baja**: el L298N degrada su salida al calentarse, así que toda medición eléctrica en stall mide un blanco móvil. ⚠️ El 8b además **imprime física equivocada** sobre la ganancia con MOSFETs — ignorar ese bloque. ✅ Sí aportó el hallazgo del modo coast (ver abajo) y descartó que el bus se hunda (12.12 → 12.07 V). |
 | 9 — Torque COAST vs BRAKE | **[`test9_decay_torque_esp32/`](test/test9_decay_torque_esp32/test9_decay_torque_esp32.ino)** | ✅ **Corrido 2026-08-17, extendido 2026-08-18 — revierte el veredicto dos veces.** Ver `docs/conexiones-registro-pruebas.md` 7.19 y 7.20. **17/08**: pasar de coast a brake multiplica el torque por 2.67 (un motor a la vez): θ 2.05°→5.47°, pasa el criterio de 5.0°. **18/08**: con los DOS motores conduciendo a la vez (condición real) el torque cae 31-36% desde la primera lectura (no es térmico) y θ baja a **3.6°** — ya no pasa contra 5.0°. Criterio bajado a 3.0° por decisión del usuario, sin justificar todavía contra la perturbación real. Modos agregados: `e` (sostenido continuo) y `w` (intermitente ON/OFF) para el ensayo térmico. Radio configurable por Serial (`r`, 33 mm) — es del montaje, no del robot. |
 | 10 — Error de colocación manual | **[`test10_pitch_colocacion_esp32/`](test/test10_pitch_colocacion_esp32/test10_pitch_colocacion_esp32.ino)** | ✅ **Corrido (2026-08-19/20).** Perturbación real medida: **media 1.98°, peor caso 3.06° (n=22)** — contra el θ_umbral≈3.65° recalculado con K_U bajo carga simultánea, deja ~20% de margen. Ya cargado en `notebooks/pso_pendulo_invertido.ipynb` como los 3 escenarios de ángulo (1.5°/2.0°/3.0°) y de velocidad (−0.15/0/+0.15 rad/s). ⚠️ Resultado sin transcribir todavía a `docs/conexiones-registro-pruebas.md` (queda en el notebook y en `informes/borrador_entrega.md`). |
-| 11 — Bring-up BTS7960 | [`test11_motores_bts7960_esp32/`](test/test11_motores_bts7960_esp32/test11_motores_bts7960_esp32.ino) | ⏳ **Compila, no flasheado — es el sketch de la Etapa 3.** ✅ **Revisado y ampliado 2026-10-11**: lee los dos encoders en cada pulso (Δpulsos, RPM de los últimos 500 ms, y sentido físico según la convención de §7.30: adelante = M1 negativo / M2 positivo), imprime `esp_reset_reason()` al arrancar (detecta brownout por la corriente de los motores), `x` corta el pulso en el acto (antes `delay(2000)` bloqueaba), y se sacaron los mensajes desactualizados ("sin pull-downs", "tope 130", "pines: asunción"). Pines verificados (§7.30), cap 121, `EN` en alto solo durante el pulso, PWM nunca en `RPWM` y `LPWM` a la vez. ⚠️ Historia: sus `#define` tenían `M1_RPWM = 14` hasta el 2026-09-12. **Coast vs. brake en este driver sigue sin medirse** — la inferencia de 8.7 es del datasheet, no de la balanza. |
+| 11 — Bring-up BTS7960 | [`test11_motores_bts7960_esp32/`](test/test11_motores_bts7960_esp32/test11_motores_bts7960_esp32.ino) | ✅ **Flasheado y corrido 2026-10-12** (Etapa 3, §7.31): M2 gira (413 RPM a duty 80), M1 no (salida del IBT-2 #1 en ~1/4 del ideal). Se le agregó el comando `t` (pulso de 1–6 s, por defecto 2 s) para que el multímetro se asiente. ✅ **Revisado y ampliado 2026-10-11**: lee los dos encoders en cada pulso (Δpulsos, RPM de los últimos 500 ms, y sentido físico según la convención de §7.30: adelante = M1 negativo / M2 positivo), imprime `esp_reset_reason()` al arrancar (detecta brownout por la corriente de los motores), `x` corta el pulso en el acto (antes `delay(2000)` bloqueaba), y se sacaron los mensajes desactualizados ("sin pull-downs", "tope 130", "pines: asunción"). Pines verificados (§7.30), cap 121, `EN` en alto solo durante el pulso, PWM nunca en `RPWM` y `LPWM` a la vez. ⚠️ Historia: sus `#define` tenían `M1_RPWM = 14` hasta el 2026-09-12. **Coast vs. brake en este driver sigue sin medirse** — la inferencia de 8.7 es del datasheet, no de la balanza. |
 | 12 — Mapeo de señales + pull-downs | **[`test12_mapeo_senales_esp32/`](test/test12_mapeo_senales_esp32/test12_mapeo_senales_esp32.ino)** | ✅ **Flasheado y corrido 2026-09-21** (placa nueva, montada): modo `z` → 6 líneas en 0.00–0.01V; modo `p` → `EN` 0.45V, `RPWM`/`LPWM` 0.54–0.56V (registro §7.28). ✅ **Mapeo con los modos 1–6 hecho 2026-10-11**: 8/8 entradas a 3.17–3.20V, sin cruces (§7.30). Etapa 2.1 de `docs/plan-pruebas-pre-energizacion.html`. Pone **una** línea de señal en alto a la vez (niveles DC, no PWM) para verificar con multímetro que cada GPIO llega al pin correcto del header — cierra el riesgo del reordenamiento M1↔M2 del 2026-09-12 y del cambio `RPWM` M1 de GPIO14 a **GPIO19**. Modo `z`: los 6 GPIO en alta impedancia (simula un ESP32 colgado). ⚠️ **Corregido 2026-09-14: el modo `z` NO prueba las pull-downs** — una línea flotante medida con multímetro también da ~0V. ✅ **Modo `p` agregado 2026-09-16** (compila, sin flashear): `p` + línea 1–6 pone esa línea en `INPUT_PULLUP` con las otras 5 en bajo — es la prueba válida de la pull-down (registro §7.27). Imprime `esp_reset_reason()` al arrancar (detecta brownout). Seguro por construcción: una sola línea en alto no puede girar nada según la tabla de verdad del BTS7960. |
 | 13 — Riel de los pull-ups del GY-521 | **[`test13_riel_pullups_mpu_esp32/`](test/test13_riel_pullups_mpu_esp32/test13_riel_pullups_mpu_esp32.ino)** | ✅ **Corrido 2026-09-21.** El 3.515V resultó ser un **desfase de masa**: el GND del ESP32 estaba en un pin que no es masa (registro §7.29). Con la masa corregida el riel da **3.35V**, y SDA/SCL 3.3V — no concluye sobre el regulador del GY-521, pero ya no hace falta. Motivo original: el riel 3V3 del ESP32 mide **3.515V**, por encima del máximo de operación del MPU6050 (3.46V). Deja SDA/SCL en `INPUT` sin pull y **sin `Wire.begin`** (activaría pull-ups internos), con los 6 pines de drivers en bajo. Si SDA/SCL en reposo miden claramente menos que el 3V3, los pull-ups de 2.2kΩ del GY-521 cuelgan de un regulador propio y el chip no ve los 3.515V. Imprime `esp_reset_reason()`. |
 | 6 — Velocidad por encoder | **[`test6_velocidad_esp32/`](test/test6_velocidad_esp32/test6_velocidad_esp32.ino)** | ✅ **Flasheado y validado** (2026-08-14). Modo 1: diagnóstico en lazo abierto, un motor por vez, aísla motor/canal/encoder. Modo 2: control de velocidad PI por rueda realimentado por encoder, sin filtro. De acá salieron la revisión del cap de PWM y la asimetría M1/M2. Topes de seguridad en capas. AP `RobotBalance_Test6`. |
@@ -1559,7 +1567,21 @@ sensor y de la mecánica, no del microcontrolador.
 
 ## Estado del diseño / Pendientes abiertos
 
-### 🎯 Próximo paso inmediato (actualizado 2026-10-11)
+### 🎯 Próximo paso inmediato (actualizado 2026-10-12)
+
+⛔⛔ **INCIDENTE 2026-10-12 — NO ENERGIZAR NADA (registro §7.31).** Midiendo `B+` del IBT-2 #1, la
+punta del multímetro **puenteó `B+` y `B−`** (corto directo de la batería, chispazo leve). Después,
+con batería sola, **el ESP32 (MAC `20:9b:a9:67:89:c0`) se recalentó** y se le encendió el LED
+azul (nunca visto antes): casi seguro muerto. **El riel
+de 3V3 da continuidad a GND** (antes 135kΩ). Causa del daño **sin confirmar** — sospecha principal:
+el pico del corto dañó al Buck y su salida subió hacia 12V. **Retomar con la lista de §7.31**, todo
+pasivo sin batería: 3V3 en Ω → sacar el ESP32 y re-medir → 5V en Ω (ref. ~360Ω) → fusible → Buck
+aislado con batería (5.01V esperado) → IBT-2 #1. **No poner otra placa ESP32 hasta cerrar eso.**
+
+**Además, Etapa 3 a medias (§7.31)**: **M2 anda** (IBT-2 #2 entrega el duty completo a 20 kHz: 4.0V
+a duty 80, 413 RPM; 580 RPM a duty 110; `FWD` = atrás del robot). **M1 no gira**: la **salida del
+IBT-2 #1 ya sale en ~1/4 del ideal** (1.0V a duty 80 en la bornera). Pendiente discriminar entre
+alimentación del #1 bajo carga, motor M1 en corto, o IBT-2 #1 dañado.
 
 ✅ **Etapa 2 cerrada (2026-10-11, registro §7.30)**: arranque `POWERON` sin brownout; Test 0 → MPU en `0x68`, `WHO_AM_I` correcto a 100 y 400 kHz; `VCC` del GY-521 3.247V con LED encendido; Test 12 modos 1–6 → las 8 entradas de los dos IBT-2 a 3.17–3.20V, sin cruces (**validados el reordenamiento M1/M2 y `RPWM` M1 en GPIO19**; GPIO14 sin cable); Test 3 Fase 0 → PPR M1 69.2 / M2 70.0, M1 negativo y M2 positivo hacia adelante, canal B de los dos OK por ida y vuelta. Filas de los encoders: M1 A/B → f.18/19, M2 A/B → f.20/21 (columna A).
 
