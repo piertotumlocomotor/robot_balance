@@ -5,7 +5,7 @@ parámetros medidos del robot real (**planta nueva**: 2× BTS7960 + chasis de ba
 Se comparan **DQN**, **Double DQN** y **A2C** sobre el mismo entorno.
 
 **Abrir en Google Colab** (no requiere instalar nada):
-[![Informe ejecutable](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/develop/aprendizaje_refuerzo/desafio1_profesor.ipynb) `desafio1_profesor.ipynb` ·
+[![Informe ejecutable](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/desafio1-rl/desafio1_profesor.ipynb) `desafio1_profesor.ipynb` ·
 [![Guía de estudio](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/develop/aprendizaje_refuerzo/guia_estudio.ipynb) `guia_estudio.ipynb`
 
 ## Qué leer, en orden
@@ -15,6 +15,7 @@ Se comparan **DQN**, **Double DQN** y **A2C** sobre el mismo entorno.
 | `guia_estudio.ipynb` | **Para entender**: el modelo, el MDP y cada algoritmo, con celdas cortas para probar |
 | `informe/guia_estudio.pdf` | **Para entender**, en PDF: de Monte Carlo a DQN y A2C, y el MDP del robot paso a paso |
 | `informe/desafio1_robot_balanceador.pdf` | **El informe para subir al campus** |
+| rama `desafio1-rl` | **Lo que se comparte con el profesor**: solo lo necesario para ejecutar el desafío |
 | `desafio1_profesor.ipynb` | **Para entregar**: autocontenido, corre en Google Colab de punta a punta |
 | `entorno.py` | El simulador (Gymnasium): física, acciones, recompensa, fin de episodio |
 | `agentes.py` | DQN / Double DQN y A2C |

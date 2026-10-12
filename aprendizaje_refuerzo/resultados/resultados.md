@@ -16,4 +16,4 @@ Experimento completo: 10 semillas por agente; evaluación sin exploración en 20
 - **El PD ajustado a mano rinde igual que el mejor agente** (494.4 contra 493.3). El modelo es casi lineal y el problema es chico; el aporte del aprendizaje por refuerzo es llegar al mismo desempeño **sin conocer la ecuación**, solo con la recompensa.
 - En todos los casos queda una **oscilación residual** de unas décimas de grado cerca de la vertical (Figura 6), por la falta de niveles de motor finos (sección 6).
 
-**Inconvenientes y limitaciones**: ver el informe PDF (`informe/desafio1_robot_balanceador.pdf`), secciones 6 y 7.
+**Inconvenientes y limitaciones**: ver el informe PDF entregado, secciones 6 y 7.

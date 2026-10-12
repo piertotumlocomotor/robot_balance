@@ -12,7 +12,7 @@ from estilo import *   # noqa: F401,F403  (estilos, helpers y reportlab)
 
 FIG = os.path.join(HERE, "..", "figuras")
 RES = os.path.join(HERE, "..", "resultados", "resultados.json")
-REPO = "https://github.com/piertotumlocomotor/robot_balance/tree/develop/aprendizaje_refuerzo"
+REPO = "https://github.com/piertotumlocomotor/robot_balance/tree/desafio1-rl"
 
 R = json.load(open(RES))
 EV, N_SEM, N_EVAL = R["evaluacion"], len(R["semillas"]), R["n_eval"]
@@ -315,10 +315,10 @@ for ref in [
 story.append(Spacer(1, 3 * mm))
 story.append(HRFlowable(width="100%", thickness=0.6, color=RULE))
 story.append(Spacer(1, 2 * mm))
-COLAB = ("https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/develop/"
-         "aprendizaje_refuerzo/desafio1_profesor.ipynb")
+COLAB = ("https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/desafio1-rl/"
+         "desafio1_profesor.ipynb")
 story.append(Paragraph(
-    f'Código fuente y registro de mediciones: <link href="{REPO}" color="#185fa5">{REPO}</link><br/>'
+    f'Código fuente: <link href="{REPO}" color="#185fa5">{REPO}</link><br/>'
     f'Notebook ejecutable en Google Colab: <link href="{COLAB}" color="#185fa5">{COLAB}</link>', st_caption))
 
 if __name__ == "__main__":

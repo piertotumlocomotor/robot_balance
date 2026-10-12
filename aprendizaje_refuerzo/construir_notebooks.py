@@ -11,12 +11,16 @@ import json
 import os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-REPO = "https://github.com/piertotumlocomotor/robot_balance"
-COLAB = "https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/develop/aprendizaje_refuerzo/"
+# La entrega vive en una rama propia (solo lo necesario, en la raíz); la guía, en develop.
+RAMA_DESAFIO = "desafio1-rl"
+REPO = f"https://github.com/piertotumlocomotor/robot_balance/tree/{RAMA_DESAFIO}"
+COLAB = "https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/"
+RUTA_COLAB = {"desafio1_profesor.ipynb": f"{RAMA_DESAFIO}/",
+              "guia_estudio.ipynb": "develop/aprendizaje_refuerzo/"}
 
 
 def boton_colab(nb):
-    return f"[![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)]({COLAB}{nb})"
+    return f"[![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)]({COLAB}{RUTA_COLAB[nb]}{nb})"
 
 
 _contador = [0]
