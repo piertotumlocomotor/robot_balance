@@ -1,7 +1,7 @@
 """
 Genera los dos notebooks a partir de los .py (el código vive en un solo lugar).
 
-    desafio1_profesor.ipynb   versión de entrega, autocontenida para Colab
+    rl1_desafio1_cesaryepez.ipynb   versión de entrega, autocontenida para Colab
     guia_estudio.ipynb        versión para entender los algoritmos, paso a paso
 
 Correr:  python construir_notebooks.py
@@ -15,7 +15,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 RAMA_DESAFIO = "desafio1-rl"
 REPO = f"https://github.com/piertotumlocomotor/robot_balance/tree/{RAMA_DESAFIO}"
 COLAB = "https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/"
-RUTA_COLAB = {"desafio1_profesor.ipynb": f"{RAMA_DESAFIO}/",
+RUTA_COLAB = {"rl1_desafio1_cesaryepez.ipynb": f"{RAMA_DESAFIO}/",
               "guia_estudio.ipynb": "develop/aprendizaje_refuerzo/"}
 
 
@@ -126,7 +126,7 @@ def profesor():
         "_(Correr `experimentos.py` y `construir_notebooks.py` para completar esta sección.)_"
     return [
         md(f"""
-{boton_colab("desafio1_profesor.ipynb")}
+{boton_colab("rl1_desafio1_cesaryepez.ipynb")}
 
 # Desafío 1 — Robot balanceador con aprendizaje por refuerzo
 **Aprendizaje por Refuerzo I — MIA, FIUBA, 2026** · Repositorio: {REPO}
@@ -306,5 +306,5 @@ print(evaluar(politica_a2c(modelo), RobotBalanceadorEnv, n=20))
 
 
 if __name__ == "__main__":
-    guardar("desafio1_profesor.ipynb", profesor())
+    guardar("rl1_desafio1_cesaryepez.ipynb", profesor())
     guardar("guia_estudio.ipynb", estudio())

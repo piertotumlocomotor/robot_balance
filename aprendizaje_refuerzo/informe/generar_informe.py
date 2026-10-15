@@ -316,7 +316,7 @@ story.append(Spacer(1, 3 * mm))
 story.append(HRFlowable(width="100%", thickness=0.6, color=RULE))
 story.append(Spacer(1, 2 * mm))
 COLAB = ("https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/desafio1-rl/"
-         "desafio1_profesor.ipynb")
+         "rl1_desafio1_cesaryepez.ipynb")
 story.append(Paragraph(
     f'Código fuente: <link href="{REPO}" color="#185fa5">{REPO}</link><br/>'
     f'Notebook ejecutable en Google Colab: <link href="{COLAB}" color="#185fa5">{COLAB}</link>', st_caption))
