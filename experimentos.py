@@ -4,7 +4,7 @@ Experimento del Desafío 1: DQN vs Double DQN vs A2C sobre el robot balanceador.
 Cada agente se entrena con N semillas (en paralelo, un proceso por corrida) y se
 evalúa sin exploración.
 
-Correr:   python experimentos.py                 (10 semillas, ≈ 25 min con 8 núcleos)
+Correr:   python experimentos.py                 (10 semillas, ≈ 45 min con 8 núcleos)
           python experimentos.py --semillas 3    (≈ 10 min)
           python experimentos.py --rapido        (≈ 3 min, para probar que todo anda)
 Salida:   figuras/*.png, resultados/resultados.json, resultados/modelos/*.pt
@@ -13,7 +13,7 @@ Salida:   figuras/*.png, resultados/resultados.json, resultados/modelos/*.pt
 import argparse
 import json
 import os
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, replace
 from multiprocessing import get_context
 
@@ -65,8 +65,6 @@ def correr(tarea):
     llega = np.nonzero(mm >= UMBRAL)[0]
     ev["pasos_hasta_umbral"] = float(pasos[VENTANA - 1 + llega[0]]) if len(llega) else float("nan")
     ev["episodios_entrenamiento"] = len(rets)
-    print(f"  {nombre:11s} semilla {semilla:2d}: retorno {ev['retorno']:6.1f}, "
-          f"sobrevive {ev['supervivencia']:5.1f}%", flush=True)
     estado = {k: v.cpu() for k, v in modelo.state_dict().items()}
     return nombre, semilla, pasos, rets, ev, estado
 
@@ -114,13 +112,21 @@ def main(n_semillas=10, rapido=False, procesos=None):
     os.makedirs(os.path.join(RES, "modelos"), exist_ok=True)
     semillas = list(range(2 if rapido else n_semillas))
     n_eval = 30 if rapido else 200
-    procesos = procesos or max(1, (os.cpu_count() or 2) - 1)
+    nucleos = os.cpu_count() or 2
+    procesos = procesos or (nucleos if nucleos <= 4 else nucleos - 1)   # Colab: 2 núcleos, usar los dos
 
     # 1) Entrenar y evaluar, todas las corridas en paralelo ---------------------
     tareas = [(n, s, rapido, n_eval) for n in AGENTES for s in semillas]
-    print(f"{len(tareas)} corridas en {procesos} procesos...")
+    print(f"{len(tareas)} corridas en {procesos} procesos (cada DQN tarda unos minutos)...", flush=True)
+    # El avance se imprime desde este proceso: lo que imprimen los procesos
+    # auxiliares no aparece en la celda de Colab.
     with ProcessPoolExecutor(procesos, mp_context=get_context("spawn")) as pool:
-        salidas = list(pool.map(correr, tareas))
+        futuros = [pool.submit(correr, t) for t in tareas]
+        for hechas, fut in enumerate(as_completed(futuros), 1):
+            nombre, semilla, _, _, ev, _ = fut.result()
+            print(f"  [{hechas:2d}/{len(tareas)}] {nombre:11s} semilla {semilla:2d}: retorno {ev['retorno']:6.1f}, "
+                  f"sobrevive {ev['supervivencia']:5.1f}%", flush=True)
+        salidas = [f.result() for f in futuros]               # en el orden original (agente, semilla)
 
     corridas = {n: [] for n in AGENTES}
     evaluaciones = {n: [] for n in AGENTES}
