@@ -4,13 +4,13 @@ Un agente aprende a mantener vertical un robot balanceador de dos ruedas, en un 
 construido con los parámetros medidos del robot real. Se comparan **DQN**, **Double DQN** y **A2C**
 sobre el mismo entorno.
 
-[![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/desafio1-rl/desafio1_profesor.ipynb)
+[![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/piertotumlocomotor/robot_balance/blob/desafio1-rl/rl1_desafio1_cesaryepez.ipynb)
 
 ## Archivos
 
 | Archivo | Contenido |
 |---|---|
-| `desafio1_profesor.ipynb` | Notebook autocontenido: corre en Google Colab de punta a punta |
+| `rl1_desafio1_cesaryepez.ipynb` | Notebook autocontenido: corre en Google Colab de punta a punta |
 | `entorno.py` | Simulador (Gymnasium): física, acciones, recompensa, fin de episodio |
 | `agentes.py` | DQN / Double DQN y A2C |
 | `experimentos.py` | Entrena los 3 agentes con N semillas (en paralelo), evalúa y genera las figuras |
