@@ -21,7 +21,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Siempre CPU, aun con GPU disponible: las redes son chicas (≈ 5 000 pesos) y el agente
+# decide de a un paso por vez, así que copiar cada dato a la GPU cuesta más que la cuenta.
+device = torch.device("cpu")
 
 
 def fijar_semilla(seed):

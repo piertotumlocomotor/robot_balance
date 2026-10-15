@@ -135,8 +135,9 @@ def profesor():
 motores. Se construyó un simulador con los parámetros medidos del robot real y se entrenaron tres
 agentes: **DQN**, **Double DQN** y **A2C**, comparados sobre el mismo entorno.
 
-**Cómo correrlo.** *Entorno de ejecución → Ejecutar todas.* Con `RAPIDO = True` tarda ≈ 4 min;
-con `False` entrena como en el informe (las semillas se reparten entre los núcleos disponibles).
+**Cómo correrlo.** *Entorno de ejecución → Ejecutar todas*, con entorno de ejecución **CPU** (la GPU
+no acelera estas redes chicas). Con `RAPIDO = True` tarda ≈ 10 min en Colab; con `False` entrena
+como en el informe (las semillas se reparten entre los núcleos disponibles).
 """),
         INSTALAR,
         md(MODELO_MD), md(MDP_MD),
@@ -153,8 +154,8 @@ con `False` entrena como en el informe (las semillas se reparten entre los núcl
         archivo("agentes.py"),
         md("### Experimento: 3 agentes × N semillas, en paralelo"), archivo("experimentos.py", oculto=True),
         code("""
-RAPIDO = True      # True: 2 semillas cortas (≈ 4 min). False: entrenamiento completo
-N_SEMILLAS = 3     # el informe usa 10 (≈ 30 min con 8 núcleos; en Colab, con 2 núcleos, varias horas)
+RAPIDO = True      # True: 2 semillas cortas (≈ 10 min en Colab). False: entrenamiento completo
+N_SEMILLAS = 3     # solo si RAPIDO = False. El informe usa 10 (≈ 45 min con 8 núcleos; en Colab, varias horas)
 import experimentos
 experimentos.main(n_semillas=N_SEMILLAS, rapido=RAPIDO)
 """),
